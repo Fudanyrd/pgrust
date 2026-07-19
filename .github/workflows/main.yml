@@ -10,7 +10,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -20,7 +20,7 @@ jobs:
         DEBIAN_FRONTEND: noninteractive
       run: |
         sudo apt update
-        sudo apt install -y build-essential pkg-config libicu-dev libssl-dev libldap2-dev libpam0g-dev postgresql-client --no-install-recommends
+        sudo apt install -y build-essential pkg-config libicu-dev libssl-dev libldap2-dev libpam0g-dev postgresql-client-18 --no-install-recommends
         curl "https://static.rust-lang.org/rustup/archive/1.29.0/x86_64-unknown-linux-gnu/rustup-init" > rustup-init
         chmod +x rustup-init
         sudo ./rustup-init -y --profile minimal --default-toolchain 1.97.1 --default-host x86_64-unknown-linux-gnu
@@ -35,3 +35,13 @@ jobs:
         ./.github/workflows/starter.sh &
         psql -h /tmp -p 5432 -U postgres -d postgres -c "SELECT 1, version(), 1 + 1 as TWO;"
         kill -s SIGTERM "$(jobs -p)"
+        wait; echo "pgrust exited with $?"
+        rm -rf /tmp/pgrust-data
+    - name: Run Regression
+      run: |
+        ./scripts/run-regression
+    # - name: Upload Binary
+    #   uses: actions/upload-artifact@v3
+    #   with:
+    #     name: pgrust-binary
+    #     path: target/release/postgres

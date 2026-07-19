@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 
 # README > run pgrust
+set -e
+mkdir -p /tmp/pgrust-data
+
+./target/release/postgres --initdb \
+  -D /tmp/pgrust-data \
+  -L "$PWD/vendor/postgres-18.3/share" \
+  --no-locale \
+  --encoding UTF8 \
+  -U postgres
 
 ulimit -s 65520
 
