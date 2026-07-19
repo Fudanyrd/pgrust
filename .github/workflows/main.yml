@@ -1,0 +1,37 @@
+name: Testing
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    branches:
+    - main
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    # as suggested in README:
+    - name: Install Dependencies
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        sudo apt update
+        sudo apt install -y build-essential pkg-config libicu-dev libssl-dev libldap2-dev libpam0g-dev postgresql-client --no-install-recommends
+        curl "https://static.rust-lang.org/rustup/archive/1.29.0/x86_64-unknown-linux-gnu/rustup-init" > rustup-init
+        chmod +x rustup-init
+        sudo ./rustup-init -y --profile minimal --default-toolchain 1.97.1 --default-host x86_64-unknown-linux-gnu
+        source $HOME/.cargo/env
+        cargo --version && rustc --version
+    - name: Build
+      run: |
+        export PGRUST_PGSHAREDIR="$(pwd)/vendor/postgres-18.3/share"
+        cargo build --release --locked --bin postgres
+    - name: Smoke Test
+      run: |
+        ./.github/workflows/starter.sh &
+        psql -h /tmp -p 5432 -U postgres -d postgres -c "SELECT 1, version(), 1 + 1 as TWO;"
+        kill -s SIGTERM "$(jobs -p)"
