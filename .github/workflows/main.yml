@@ -30,13 +30,9 @@ jobs:
       run: |
         export PGRUST_PGSHAREDIR="$(pwd)/vendor/postgres-18.3/share"
         cargo build --release --locked --bin postgres
-    - name: Smoke Test
+    - name: Run Unittest
       run: |
-        ./.github/workflows/starter.sh &
-        psql -h /tmp -p 5432 -U postgres -d postgres -c "SELECT 1, version(), 1 + 1 as TWO;"
-        kill -s SIGTERM "$(jobs -p)"
-        wait; echo "pgrust exited with $?"
-        rm -rf /tmp/pgrust-data
+        cargo test --locked --release --all
     - name: Run Regression
       run: |
         ./scripts/run-regression
