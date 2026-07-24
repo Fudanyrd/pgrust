@@ -35,6 +35,7 @@ jobs:
         cargo test --locked --release --all || true
     - name: Run Regression
       run: |
+        export PGRUST_BIN="$(pwd)/target/release/postgres"
         ./scripts/run-regression
     # - name: Upload Binary
     #   uses: actions/upload-artifact@v3
