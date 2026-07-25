@@ -32,11 +32,15 @@ jobs:
         cargo build --release --locked --bin postgres
     - name: Run Unittest
       run: |
+        export PGRUST_PGSHAREDIR="$(pwd)/vendor/postgres-18.3/share"
         cargo test --locked --release --all || true
     - name: Run Regression
       run: |
+        export PGRUST_PGSHAREDIR="$(pwd)/vendor/postgres-18.3/share"
         export PGRUST_BIN="$(pwd)/target/release/postgres"
         ./scripts/run-regression
+    # Releasing pgrust binary in this way will cost me dearly,
+    # so I'm not doing this (sry).
     # - name: Upload Binary
     #   uses: actions/upload-artifact@v3
     #   with:
