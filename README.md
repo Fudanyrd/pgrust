@@ -41,6 +41,8 @@ Update: We're working on a new not yet published version of pgrust that currentl
 [Get project updates by email](https://pgrust.com/#updates), including new
 releases, compatibility milestones, and architecture experiments.
 
+Latest blog post: https://malisper.me/postgres-in-rust-regression-suite
+
 ## Status
 
 pgrust is not production-ready yet. It is not performance optimized yet.
