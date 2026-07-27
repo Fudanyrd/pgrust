@@ -1311,21 +1311,21 @@ fn read_a_expr<'mcx>(mcx: Mcx<'mcx>) -> PgResult<A_Expr<'mcx>> {
     // Peek the first token: an operator keyword chooses the kind (and the next
     // thing is `:name <list>`); a `:name` label means AEXPR_OP (and we read the
     // value directly).
-    let tok = next_token()?;
+    let tok = next_token().unwrap_or_else(|e| panic!("read_a_expr: failed to peek first token: {}", e));
     let (kind, name): (A_Expr_Kind, PgVec<'mcx, NodePtr<'mcx>>) = match tok.bytes {
-        b"ANY" => (A_Expr_Kind::AEXPR_OP_ANY, read_node_vec_field(mcx)?),
-        b"ALL" => (A_Expr_Kind::AEXPR_OP_ALL, read_node_vec_field(mcx)?),
-        b"DISTINCT" => (A_Expr_Kind::AEXPR_DISTINCT, read_node_vec_field(mcx)?),
-        b"NOT_DISTINCT" => (A_Expr_Kind::AEXPR_NOT_DISTINCT, read_node_vec_field(mcx)?),
-        b"NULLIF" => (A_Expr_Kind::AEXPR_NULLIF, read_node_vec_field(mcx)?),
-        b"IN" => (A_Expr_Kind::AEXPR_IN, read_node_vec_field(mcx)?),
-        b"LIKE" => (A_Expr_Kind::AEXPR_LIKE, read_node_vec_field(mcx)?),
-        b"ILIKE" => (A_Expr_Kind::AEXPR_ILIKE, read_node_vec_field(mcx)?),
-        b"SIMILAR" => (A_Expr_Kind::AEXPR_SIMILAR, read_node_vec_field(mcx)?),
-        b"BETWEEN" => (A_Expr_Kind::AEXPR_BETWEEN, read_node_vec_field(mcx)?),
-        b"NOT_BETWEEN" => (A_Expr_Kind::AEXPR_NOT_BETWEEN, read_node_vec_field(mcx)?),
-        b"BETWEEN_SYM" => (A_Expr_Kind::AEXPR_BETWEEN_SYM, read_node_vec_field(mcx)?),
-        b"NOT_BETWEEN_SYM" => (A_Expr_Kind::AEXPR_NOT_BETWEEN_SYM, read_node_vec_field(mcx)?),
+        b"ANY" => (A_Expr_Kind::AEXPR_OP_ANY, read_node_vec_field(mcx).unwrap()),
+        b"ALL" => (A_Expr_Kind::AEXPR_OP_ALL, read_node_vec_field(mcx).unwrap()),
+        b"DISTINCT" => (A_Expr_Kind::AEXPR_DISTINCT, read_node_vec_field(mcx).unwrap()),
+        b"NOT_DISTINCT" => (A_Expr_Kind::AEXPR_NOT_DISTINCT, read_node_vec_field(mcx).unwrap()),
+        b"NULLIF" => (A_Expr_Kind::AEXPR_NULLIF, read_node_vec_field(mcx).unwrap()),
+        b"IN" => (A_Expr_Kind::AEXPR_IN, read_node_vec_field(mcx).unwrap()),
+        b"LIKE" => (A_Expr_Kind::AEXPR_LIKE, read_node_vec_field(mcx).unwrap()),
+        b"ILIKE" => (A_Expr_Kind::AEXPR_ILIKE, read_node_vec_field(mcx).unwrap()),
+        b"SIMILAR" => (A_Expr_Kind::AEXPR_SIMILAR, read_node_vec_field(mcx).unwrap()),
+        b"BETWEEN" => (A_Expr_Kind::AEXPR_BETWEEN, read_node_vec_field(mcx).unwrap()),
+        b"NOT_BETWEEN" => (A_Expr_Kind::AEXPR_NOT_BETWEEN, read_node_vec_field(mcx).unwrap()),
+        b"BETWEEN_SYM" => (A_Expr_Kind::AEXPR_BETWEEN_SYM, read_node_vec_field(mcx).unwrap()),
+        b"NOT_BETWEEN_SYM" => (A_Expr_Kind::AEXPR_NOT_BETWEEN_SYM, read_node_vec_field(mcx).unwrap()),
         b":name" => {
             // AEXPR_OP: the peeked token WAS the :name label, so read the value
             // (a `(...)` list of String nodes) directly via node_read.
@@ -1982,7 +1982,7 @@ mod tests {
             alias: None,
             location: 5,
         };
-        let text = assert_framed_round_trip(&Node::mk_range_var(mcx, rv)?);
+        let text = assert_framed_round_trip(&Node::mk_range_var(mcx, rv).unwrap());
         assert!(text.starts_with("{RANGEVAR :catalogname <>"), "{text}");
         assert!(text.contains(":relname t"), "{text}");
         assert!(text.contains(":relpersistence p"), "{text}");
@@ -1997,7 +1997,7 @@ mod tests {
             aliasname: Some(PgString::from_str_in("a", mcx).unwrap()),
             colnames: PgVec::new_in(mcx),
         };
-        let text = assert_framed_round_trip(&Node::mk_alias(mcx, a)?);
+        let text = assert_framed_round_trip(&Node::mk_alias(mcx, a).unwrap());
         assert!(text.starts_with("{ALIAS :aliasname a :colnames <>"), "{text}");
     }
 
@@ -2013,7 +2013,7 @@ mod tests {
             nulls_first: false,
             hashable: true,
         };
-        let text = assert_framed_round_trip(&Node::mk_sort_group_clause(mcx, s)?);
+        let text = assert_framed_round_trip(&Node::mk_sort_group_clause(mcx, s).unwrap());
         assert!(text.starts_with("{SORTGROUPCLAUSE :tleSortGroupRef 3 :eqop 96"), "{text}");
         assert!(text.contains(":reverse_sort true"), "{text}");
         assert!(text.ends_with(":hashable true}"), "{text}");
@@ -2033,7 +2033,7 @@ mod tests {
         r.perminfoindex = 1;
         r.lateral = false;
         r.inFromCl = true;
-        let text = assert_framed_round_trip(&Node::mk_range_tbl_entry(mcx, r)?);
+        let text = assert_framed_round_trip(&Node::mk_range_tbl_entry(mcx, r).unwrap());
         assert!(text.starts_with("{RANGETBLENTRY :alias <> :eref <> :rtekind 0"), "{text}");
         assert!(text.contains(":relid 16384"), "{text}");
         assert!(text.contains(":relkind r"), "{text}");
@@ -2078,7 +2078,7 @@ mod tests {
             ctecoltypmods: coltypmods,
             ctecolcollations: colcollations,
         };
-        let text = assert_framed_round_trip(&Node::mk_common_table_expr(mcx, cte)?);
+        let text = assert_framed_round_trip(&Node::mk_common_table_expr(mcx, cte).unwrap());
         assert!(text.starts_with("{COMMONTABLEEXPR :ctename w"), "{text}");
         assert!(
             text.contains(":search_clause {CTESEARCHCLAUSE :search_col_list <> :search_breadth_first true :search_seq_column seq"),

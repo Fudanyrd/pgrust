@@ -158,7 +158,7 @@ fn remember_and_process_sync_request() {
     let mut s = setup(|_| {});
     init_sync(&mut s, true);
     remember_sync_request(&mut s, &tag(7), SyncRequestType::SYNC_REQUEST).unwrap();
-    process_sync_requests(&mut s, rt_enable_fsync(), false).unwrap();
+    process_sync_requests(rt_enable_fsync(), false).unwrap();
     assert_eq!(with_rt(|rt| rt.synced.clone()), vec![tag(7)]);
     assert_eq!(with_rt(|rt| rt.ckpt_rels), 1);
     assert_eq!(s.pending_ops.as_ref().unwrap().len(), 0);
@@ -170,7 +170,7 @@ fn forget_request_cancels_entry() {
     init_sync(&mut s, true);
     remember_sync_request(&mut s, &tag(7), SyncRequestType::SYNC_REQUEST).unwrap();
     remember_sync_request(&mut s, &tag(7), SyncRequestType::SYNC_FORGET_REQUEST).unwrap();
-    process_sync_requests(&mut s, rt_enable_fsync(), false).unwrap();
+    process_sync_requests(rt_enable_fsync(), false).unwrap();
     assert!(with_rt(|rt| rt.synced.is_empty()));
     assert_eq!(s.pending_ops.as_ref().unwrap().len(), 0);
 }
@@ -182,7 +182,7 @@ fn filter_request_cancels_matching_db() {
     remember_sync_request(&mut s, &tag(7), SyncRequestType::SYNC_REQUEST).unwrap();
     let filter = FileTag::new(SyncRequestHandler::SYNC_HANDLER_MD, MAIN_FORKNUM, locator(0, 2, 0), 0);
     remember_sync_request(&mut s, &filter, SyncRequestType::SYNC_FILTER_REQUEST).unwrap();
-    process_sync_requests(&mut s, rt_enable_fsync(), false).unwrap();
+    process_sync_requests(rt_enable_fsync(), false).unwrap();
     assert!(with_rt(|rt| rt.synced.is_empty()));
 }
 
@@ -193,7 +193,7 @@ fn filter_request_keeps_other_db() {
     remember_sync_request(&mut s, &tag(7), SyncRequestType::SYNC_REQUEST).unwrap();
     let filter = FileTag::new(SyncRequestHandler::SYNC_HANDLER_MD, MAIN_FORKNUM, locator(0, 999, 0), 0);
     remember_sync_request(&mut s, &filter, SyncRequestType::SYNC_FILTER_REQUEST).unwrap();
-    process_sync_requests(&mut s, rt_enable_fsync(), false).unwrap();
+    process_sync_requests(rt_enable_fsync(), false).unwrap();
     assert_eq!(with_rt(|rt| rt.synced.clone()), vec![tag(7)]);
 }
 
@@ -214,7 +214,7 @@ fn fsync_enoent_retry_then_success() {
     let mut s = setup(|rt| rt.sync_fail_then_ok = true);
     init_sync(&mut s, true);
     remember_sync_request(&mut s, &tag(7), SyncRequestType::SYNC_REQUEST).unwrap();
-    process_sync_requests(&mut s, rt_enable_fsync(), false).unwrap();
+    process_sync_requests(rt_enable_fsync(), false).unwrap();
     assert_eq!(with_rt(|rt| rt.synced.clone()), vec![tag(7)]);
     assert!(with_rt(|rt| rt.sync_failed_once));
 }
@@ -224,7 +224,7 @@ fn fsync_disabled_skips_handler() {
     let mut s = setup(|rt| rt.enable_fsync = false);
     init_sync(&mut s, true);
     remember_sync_request(&mut s, &tag(7), SyncRequestType::SYNC_REQUEST).unwrap();
-    process_sync_requests(&mut s, rt_enable_fsync(), false).unwrap();
+    process_sync_requests(rt_enable_fsync(), false).unwrap();
     assert!(with_rt(|rt| rt.synced.is_empty()));
     assert_eq!(with_rt(|rt| rt.ckpt_rels), 0);
     assert_eq!(s.pending_ops.as_ref().unwrap().len(), 0);
@@ -289,7 +289,7 @@ fn register_local_remembers_when_pending_ops_present() {
 #[test]
 fn process_without_pending_ops_errors() {
     let mut s = setup(|_| {});
-    assert!(process_sync_requests(&mut s, rt_enable_fsync(), false).is_err());
+    assert!(process_sync_requests(rt_enable_fsync(), false).is_err());
 }
 
 #[test]
@@ -313,7 +313,7 @@ fn canceled_then_rerequested_reinitializes() {
     assert!(pending_entry(&s, tag(7)).canceled);
     remember_sync_request(&mut s, &tag(7), SyncRequestType::SYNC_REQUEST).unwrap();
     assert!(!pending_entry(&s, tag(7)).canceled);
-    process_sync_requests(&mut s, rt_enable_fsync(), false).unwrap();
+    process_sync_requests(rt_enable_fsync(), false).unwrap();
     assert_eq!(with_rt(|rt| rt.synced.clone()), vec![tag(7)]);
 }
 

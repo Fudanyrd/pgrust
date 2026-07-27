@@ -15374,6 +15374,8 @@ name = "numutils"
 version = "0.0.0"
 dependencies = [
  "fe_seams",
+ "numutils_fgram",
+ "pg_ffi_fgram",
  "types_error",
 ]
 

@@ -17,7 +17,7 @@ use ::nodes::primnodes::{
 /// A distinct opaque (non-constant) leaf: a `Var` whose `varattno` is `v`.
 /// `find_duplicate_ors` drops any `Const` reaching it, so leaves must be
 /// non-`Const` to survive.
-fn leaf(v: i16) -> Expr {
+fn leaf<'a>(v: i16) -> Expr<'a> {
     Expr::Var(Var {
         varno: 1,
         varattno: v,
@@ -29,11 +29,12 @@ fn leaf(v: i16) -> Expr {
 }
 
 /// A non-null boolean `Const`.
-fn bool_const(value: bool) -> Expr {
+fn bool_const<'a>(value: bool) -> Expr<'a> {
     Expr::Const(nodes_core::makefuncs::make_bool_const(value, false))
 }
 
-fn and_of(args: alloc::vec::Vec<Expr>) -> Expr {
+
+fn and_of<'a>(args: alloc::vec::Vec<Expr<'a>>) -> Expr<'a> {
     Expr::BoolExpr(BoolExpr {
         boolop: BoolExprType::AND_EXPR,
         args,
@@ -41,7 +42,7 @@ fn and_of(args: alloc::vec::Vec<Expr>) -> Expr {
     })
 }
 
-fn or_of(args: alloc::vec::Vec<Expr>) -> Expr {
+fn or_of<'a>(args: alloc::vec::Vec<Expr<'a>>) -> Expr<'a> {
     Expr::BoolExpr(BoolExpr {
         boolop: BoolExprType::OR_EXPR,
         args,

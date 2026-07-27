@@ -182,6 +182,7 @@ fn make_expr_context<'mcx>(mcx: ::mcx::Mcx<'mcx>) -> ::nodes::execnodes::ExprCon
         domainValue_datum: Datum::null(),
         domainValue_isNull: true,
         ecxt_callbacks: None,
+        ecxt_param_list_info: None,
     }
 }
 
@@ -205,7 +206,7 @@ fn empty_state<'mcx>(estate: &mut EStateData<'mcx>) -> TidRangeScanState<'mcx> {
 
 /// A CTID `>=` OpExpr qual cell: `ctid >= something`. `MakeTidOpExpr` classifies
 /// it as a (lower-bound, inclusive) bound.
-fn ctid_geq_qual() -> Expr {
+fn ctid_geq_qual<'a>() -> Expr<'a> {
     Expr::OpExpr(OpExpr {
         opno: TIDGreaterEqOperator,
         args: alloc::vec![

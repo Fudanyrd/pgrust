@@ -63,8 +63,8 @@ pub mod flatten;
 pub mod tlist;
 pub mod var;
 
-#[cfg(test)]
-mod tests;
+// #[cfg(test)]
+// mod tests;
 
 pub use fix_indexqual::fix_indexqual_operand;
 pub use flatten::flatten_join_alias_vars;

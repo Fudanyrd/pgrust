@@ -55,7 +55,7 @@ fn install_seams() {
 
 // --- builders ------------------------------------------------------------
 
-fn text_var(collid: Oid) -> Expr {
+fn text_var<'a>(collid: Oid) -> Expr<'a> {
     Expr::Var(Var {
         vartype: TEXTOID,
         varcollid: collid,
@@ -63,7 +63,7 @@ fn text_var(collid: Oid) -> Expr {
     })
 }
 
-fn text_const(collid: Oid) -> Expr {
+fn text_const<'a>(collid: Oid) -> Expr<'a> {
     Expr::Const(Const {
         consttype: TEXTOID,
         constcollid: collid,
@@ -73,7 +73,7 @@ fn text_const(collid: Oid) -> Expr {
 
 /// A boolean-result OpExpr over two args (e.g. `a = b`). The result type
 /// (BOOLOID) is noncollatable, but its inputcollid bubbles from the args.
-fn bool_op(args: Vec<Expr>) -> Expr {
+fn bool_op<'a>(args: Vec<Expr<'a>>) -> Expr<'a> {
     Expr::OpExpr(OpExpr {
         args,
         ..OpExpr::default()

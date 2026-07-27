@@ -1,12 +1,13 @@
 //! Tests for the structural EXPLAIN slice.
 
 use ::mcx::{alloc_in, MemoryContext, PgBox, PgVec};
-use ::types_explain::{ExplainFormat, ExplainState};
 use ::nodes::execnodes::PlanStateData;
 use ::nodes::nodeindexscan::Plan;
 use ::nodes::noderesult::{Result as ResultPlan, ResultState};
 use ::nodes::nodes::Node;
 use ::nodes::planstate::PlanStateNode;
+use ::types_explain::{ExplainFormat, ExplainState};
+use mcx::Mcx;
 
 fn empty_plan<'mcx>() -> Plan<'mcx> {
     Plan {
@@ -39,10 +40,14 @@ fn result_node_text_with_costs() {
     // Build a Result plan node and its plan-state.
     let plan_node: PgBox<'_, Node<'_>> = alloc_in(
         mcx,
-        Node::mk_result(mcx, ResultPlan {
-            plan: empty_plan(),
-            resconstantqual: None,
-        }),
+        Node::mk_result(
+            mcx,
+            ResultPlan {
+                plan: empty_plan(),
+                resconstantqual: None,
+            },
+        )
+        .unwrap(),
     )
     .unwrap();
 
@@ -65,7 +70,10 @@ fn result_node_text_with_costs() {
     crate::walk::ExplainNode(&mut es, mcx, &planstate, &ancestors, None, None).unwrap();
 
     let out = es.str.as_str();
-    assert!(out.contains("Result"), "output should name the node: {out:?}");
+    assert!(
+        out.contains("Result"),
+        "output should name the node: {out:?}"
+    );
     assert!(
         out.contains("(cost=0.00..0.01 rows=1 width=4)"),
         "output should carry the cost line: {out:?}"
@@ -82,18 +90,26 @@ fn nested_result_recursion_text() {
     // Outer Result plan node.
     let outer_plan: PgBox<'_, Node<'_>> = alloc_in(
         mcx,
-        Node::mk_result(mcx, ResultPlan {
-            plan: empty_plan(),
-            resconstantqual: None,
-        }),
+        Node::mk_result(
+            mcx,
+            ResultPlan {
+                plan: empty_plan(),
+                resconstantqual: None,
+            },
+        )
+        .unwrap(),
     )
     .unwrap();
     let inner_plan: PgBox<'_, Node<'_>> = alloc_in(
         mcx,
-        Node::mk_result(mcx, ResultPlan {
-            plan: empty_plan(),
-            resconstantqual: None,
-        }),
+        Node::mk_result(
+            mcx,
+            ResultPlan {
+                plan: empty_plan(),
+                resconstantqual: None,
+            },
+        )
+        .unwrap(),
     )
     .unwrap();
 
@@ -148,21 +164,25 @@ fn nested_result_recursion_text() {
 /// port (`ExplainScanTarget` -> `ExplainTargetRel`) without a live catalog.
 #[test]
 fn target_rel_valuesscan_alias_text() {
-    use ::nodes::nodevaluesscan::ValuesScan;
     use ::nodes::nodeindexscan::Scan;
+    use ::nodes::nodevaluesscan::ValuesScan;
     use ::nodes::parsenodes::{RTEKind, RangeTblEntry};
     use ::nodes::rawnodes::Alias;
 
     let ctx = MemoryContext::new("explain-test");
     let mcx = ctx.mcx();
 
-    let plan_node: Node<'_> = Node::mk_values_scan(mcx, ValuesScan {
-        scan: Scan {
-            plan: empty_plan(),
-            scanrelid: 1,
+    let plan_node: Node<'_> = Node::mk_values_scan(
+        mcx,
+        ValuesScan {
+            scan: Scan {
+                plan: empty_plan(),
+                scanrelid: 1,
+            },
+            values_lists: PgVec::new_in(mcx),
         },
-        values_lists: PgVec::new_in(mcx),
-    });
+    )
+    .unwrap();
 
     let mut es = ExplainState::new_in(mcx);
     es.format = ExplainFormat::EXPLAIN_FORMAT_TEXT;
@@ -237,20 +257,30 @@ fn parse_option_list_costs_off_format_json() {
 fn mk_defelem<'mcx>(mcx: ::mcx::Mcx<'mcx>, name: &str, val: &str) -> PgBox<'mcx, Node<'mcx>> {
     let arg = alloc_in(
         mcx,
-        Node::mk_string(mcx, ::nodes::value::StringNode {
-            sval: ::mcx::PgString::from_str_in(val, mcx).unwrap(),
-        }),
+        Node::mk_string(
+            mcx,
+            ::nodes::value::StringNode {
+                sval: ::mcx::PgString::from_str_in(val, mcx).unwrap(),
+            },
+        )
+        .unwrap(),
     )
     .unwrap();
+
+    // expected `Option<Box<Node<'_>, Mcx<'_>>>`, found `Box<Result<Node<'_>, PgError>, Mcx<'_>>`
     alloc_in(
         mcx,
-        Node::mk_def_elem(mcx, ::nodes::ddlnodes::DefElem {
-            defnamespace: None,
-            defname: Some(::mcx::PgString::from_str_in(name, mcx).unwrap()),
-            arg: Some(arg),
-            defaction: ::nodes::ddlnodes::DEFELEM_UNSPEC,
-            location: -1,
-        }),
+        Node::mk_def_elem(
+            mcx,
+            ::nodes::ddlnodes::DefElem {
+                defnamespace: None,
+                defname: Some(::mcx::PgString::from_str_in(name, mcx).unwrap()),
+                arg: Some(arg),
+                defaction: ::nodes::ddlnodes::DEFELEM_UNSPEC,
+                location: -1,
+            },
+        )
+        .unwrap(),
     )
     .unwrap()
 }

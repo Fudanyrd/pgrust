@@ -332,7 +332,7 @@ fn rescan_resets_flags_and_calls_exec_scan_rescan() {
     st.done = true;
     st.haveblock = true;
     st.donetuples = 7;
-    ExecReScanSampleScan(&mut st).unwrap();
+    ExecReScanSampleScan(&mut st, &mut estate).unwrap();
     assert!(!st.begun);
     assert!(!st.done);
     assert!(!st.haveblock);

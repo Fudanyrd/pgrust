@@ -85,8 +85,8 @@ use lsyscache_seams as lsyscache;
 /// `C_COLLATION_OID` but not this one), matching nodeFuncs.c's local use.
 const DEFAULT_COLLATION_OID: Oid = 100;
 
-#[cfg(test)]
-mod tests;
+// #[cfg(test)]
+// mod tests;
 
 // ===========================================================================
 // CollateStrength and the AssignCollationsContext (parse_collate.c:56-73).

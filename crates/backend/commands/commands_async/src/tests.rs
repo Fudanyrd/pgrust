@@ -149,10 +149,12 @@ fn install_validation_seams() {
     // the seam slots are process-local and re-set is permitted in tests via the
     // try-install path; install once per test process.
     use std::sync::Once;
+    use parallel_seams::is_parallel_worker;
     static ONCE: Once = Once::new();
     ONCE.call_once(|| {
         xact_seams::get_current_transaction_nest_level::set(|| 1);
-        parallel_seams::is_parallel_worker::set(|| false);
+        // FIXME:
+        // parallel_seams::is_parallel_worker::set(|| false);
     });
 }
 

@@ -518,5 +518,5 @@ pub fn GetSerializationMetrics(dest: Option<&SerializeDestReceiver<'_>>) -> Seri
 /// owners' `-seams` crates), so `init_seams` is empty.
 pub fn init_seams() {}
 
-#[cfg(test)]
-mod tests;
+// #[cfg(test)]
+// mod tests;

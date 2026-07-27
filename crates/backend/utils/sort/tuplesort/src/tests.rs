@@ -8,6 +8,18 @@ use ::types_sortsupport::{SortComparatorId, SortSupportData};
 
 const TUPLESORT_NONE: i32 = 0;
 
+fn test_comparator<'a, 'b, 'c, 'd, 'e, 'f>(a: &'a Datum<'b>, b: &'c Datum<'d>, _ssup: &'e SortSupportData<'f>) -> PgResult<i32> {
+    let xx = a.as_usize() as i64;
+    let yy = b.as_usize() as i64;
+    Ok(if xx < yy {
+        -1
+    } else if xx > yy {
+        1
+    } else {
+        0
+    })
+}
+
 /// Install a test `apply_sort_comparator` that compares two `ByVal` words as
 /// signed integers (the `ssup_datum_signed_cmp` analogue). Idempotent.
 fn install_test_comparator() {
@@ -19,17 +31,7 @@ fn install_test_comparator() {
         // do not depend on `cargo test` execution order.
         install_top_mcx_once();
         sortsupport_seams::apply_sort_comparator::set(
-            |a: Datum<'_>, b: Datum<'_>, _ssup: &SortSupportData<'_>| {
-                let xx = a.as_usize() as i64;
-                let yy = b.as_usize() as i64;
-                Ok(if xx < yy {
-                    -1
-                } else if xx > yy {
-                    1
-                } else {
-                    0
-                })
-            },
+            test_comparator,
         );
     });
 }

@@ -120,8 +120,8 @@ fn exec_re_scan_walks_params_and_dispatches() {
     // non-NULL to drive UpdateChangedParamSet.
     let mut splan_plan = Material::default();
     splan_plan.plan.extParam = Some(empty_bms(mcx).unwrap());
-    let splan_plan = ::nodes::nodes::Node::mk_material(mcx, splan_plan);
-    let child_plan = ::nodes::nodes::Node::mk_material(mcx, Material::default());
+    let splan_plan = ::nodes::nodes::Node::mk_material(mcx, splan_plan).unwrap();
+    let child_plan = ::nodes::nodes::Node::mk_material(mcx, Material::default()).unwrap();
 
     let mut estate = EStateData::new_in(mcx);
     let slot = estate.make_slot(TupleTableSlot::new_in(estate.es_query_cxt)).unwrap();
@@ -170,6 +170,7 @@ fn exec_re_scan_walks_params_and_dispatches() {
         domainValue_datum: Default::default(),
         domainValue_isNull: true,
         ecxt_callbacks: None,
+        ecxt_param_list_info: None,
     };
     mat.ss.ps.ps_ExprContext = Some(estate.add_expr_context(econtext).unwrap());
     mat.ss.ps.chgParam = Some(empty_bms(mcx).unwrap());
@@ -336,13 +337,13 @@ fn supports_backward_scan() {
     assert!(!exec_supports_backward_scan(None).unwrap());
 
     // Material: in the "don't evaluate tlist" group.
-    let mat = ::nodes::nodes::Node::mk_material(mcx, Material::default());
+    let mat = ::nodes::nodes::Node::mk_material(mcx, Material::default()).unwrap();
     assert!(exec_supports_backward_scan(Some(&mat)).unwrap());
 
     // Parallel-aware nodes can't back up.
     let mut parallel = Material::default();
     parallel.plan.parallel_aware = true;
-    let parallel = ::nodes::nodes::Node::mk_material(mcx, parallel);
+    let parallel = ::nodes::nodes::Node::mk_material(mcx, parallel).unwrap();
     assert!(!exec_supports_backward_scan(Some(&parallel)).unwrap());
 
     let _ = mcx;

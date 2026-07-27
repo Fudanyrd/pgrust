@@ -55,7 +55,7 @@ fn test_equal_expr(a: &Expr, b: &Expr) -> bool {
     }
 }
 
-fn var(varno: i32, varattno: i16) -> Expr {
+fn var<'a>(varno: i32, varattno: i16) -> Expr<'a> {
     Expr::Var(Var {
         varno,
         varattno,
@@ -97,7 +97,7 @@ fn is_null(arg: Expr) -> Expr {
     })
 }
 
-fn bool_const(v: bool) -> Expr {
+fn bool_const<'a>(v: bool) -> Expr<'a> {
     Expr::Const(Const {
         consttype: 16,
         constvalue: types_tuple::heaptuple::Datum::from_bool(v),

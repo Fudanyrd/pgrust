@@ -851,17 +851,17 @@ mod tests {
     fn integer_round_trips() {
         let ctx = MemoryContext::new("int");
         let mcx = ctx.mcx();
-        assert_round_trip(&Node::mk_integer(mcx, Integer { ival: 42 })?, "42");
-        assert_round_trip(&Node::mk_integer(mcx, Integer { ival: -7 })?, "-7");
-        assert_round_trip(&Node::mk_integer(mcx, Integer { ival: 0 })?, "0");
+        assert_round_trip(&Node::mk_integer(mcx, Integer { ival: 42 }).unwrap(), "42");
+        assert_round_trip(&Node::mk_integer(mcx, Integer { ival: -7 }).unwrap(), "-7");
+        assert_round_trip(&Node::mk_integer(mcx, Integer { ival: 0 }).unwrap(), "0");
     }
 
     #[test]
     fn boolean_round_trips() {
         let ctx = MemoryContext::new("bool");
         let mcx = ctx.mcx();
-        assert_round_trip(&Node::mk_boolean(mcx, Boolean { boolval: true })?, "true");
-        assert_round_trip(&Node::mk_boolean(mcx, Boolean { boolval: false })?, "false");
+        assert_round_trip(&Node::mk_boolean(mcx, Boolean { boolval: true }).unwrap(), "true");
+        assert_round_trip(&Node::mk_boolean(mcx, Boolean { boolval: false }).unwrap(), "false");
     }
 
     #[test]
@@ -869,10 +869,10 @@ mod tests {
         let ctx = MemoryContext::new("flt");
         let mcx = ctx.mcx();
         let fval = ::mcx::PgString::from_str_in("3.14", mcx).unwrap();
-        assert_round_trip(&Node::mk_float(mcx, Float { fval })?, "3.14");
+        assert_round_trip(&Node::mk_float(mcx, Float { fval }).unwrap(), "3.14");
         // A value too large for i32 lexes as Float and is kept verbatim.
         let big = ::mcx::PgString::from_str_in("99999999999999999999", mcx).unwrap();
-        assert_round_trip(&Node::mk_float(mcx, Float { fval: big })?, "99999999999999999999");
+        assert_round_trip(&Node::mk_float(mcx, Float { fval: big }).unwrap(), "99999999999999999999");
     }
 
     #[test]
@@ -881,13 +881,13 @@ mod tests {
         let mcx = ctx.mcx();
         // _outString wraps in quotes; the inner content is outToken-escaped.
         let sval = ::mcx::PgString::from_str_in("hello", mcx).unwrap();
-        assert_round_trip(&Node::mk_string(mcx, StringNode { sval })?, "\"hello\"");
+        assert_round_trip(&Node::mk_string(mcx, StringNode { sval }).unwrap(), "\"hello\"");
         // A string with a space gets the space backslash-escaped inside quotes.
         let spaced = ::mcx::PgString::from_str_in("a b", mcx).unwrap();
-        assert_round_trip(&Node::mk_string(mcx, StringNode { sval: spaced })?, "\"a\\ b\"");
+        assert_round_trip(&Node::mk_string(mcx, StringNode { sval: spaced }).unwrap(), "\"a\\ b\"");
         // The empty string is just `""` (no outToken `""` doubling).
         let empty = ::mcx::PgString::from_str_in("", mcx).unwrap();
-        assert_round_trip(&Node::mk_string(mcx, StringNode { sval: empty })?, "\"\"");
+        assert_round_trip(&Node::mk_string(mcx, StringNode { sval: empty }).unwrap(), "\"\"");
     }
 
     #[test]
@@ -895,9 +895,9 @@ mod tests {
         let ctx = MemoryContext::new("bits");
         let mcx = ctx.mcx();
         let bsval = ::mcx::PgString::from_str_in("b101", mcx).unwrap();
-        assert_round_trip(&Node::mk_bit_string(mcx, BitString { bsval })?, "b101");
+        assert_round_trip(&Node::mk_bit_string(mcx, BitString { bsval }).unwrap(), "b101");
         let hex = ::mcx::PgString::from_str_in("xFF", mcx).unwrap();
-        assert_round_trip(&Node::mk_bit_string(mcx, BitString { bsval: hex })?, "xFF");
+        assert_round_trip(&Node::mk_bit_string(mcx, BitString { bsval: hex }).unwrap(), "xFF");
     }
 
     #[test]
@@ -908,9 +908,9 @@ mod tests {
         // `(` + space-separated children + `)`.
         let mut elements: ::mcx::PgVec<'_, PgBox<'_, Node<'_>>> =
             ::mcx::vec_with_capacity_in(mcx, 2).unwrap();
-        elements.push(::mcx::alloc_in(mcx, Node::mk_integer(mcx, Integer { ival: 10 })?).unwrap());
-        elements.push(::mcx::alloc_in(mcx, Node::mk_boolean(mcx, Boolean { boolval: true })?).unwrap());
-        assert_round_trip(&Node::mk_list(mcx, elements)?, "(10 true)");
+        elements.push(::mcx::alloc_in(mcx, Node::mk_integer(mcx, Integer { ival: 10 }).unwrap()).unwrap());
+        elements.push(::mcx::alloc_in(mcx, Node::mk_boolean(mcx, Boolean { boolval: true }).unwrap()).unwrap());
+        assert_round_trip(&Node::mk_list(mcx, elements).unwrap(), "(10 true)");
     }
 
     #[test]
@@ -920,7 +920,7 @@ mod tests {
         let elements: ::mcx::PgVec<'_, PgBox<'_, Node<'_>>> =
             ::mcx::vec_with_capacity_in(mcx, 0).unwrap();
         // An empty list serializes as `()`.
-        let node = Node::mk_list(mcx, elements)?;
+        let node = Node::mk_list(mcx, elements).unwrap();
         let text = nodeToString(mcx, &node).unwrap();
         assert_eq!(text.as_str(), "()");
     }
@@ -969,7 +969,9 @@ mod tests {
 
     #[test]
     fn var_round_trips() {
-        let text = assert_framed_round_trip(&Node::Expr(Expr::Var(mk_var()?)));
+        let ctx = MemoryContext::new("var");
+        let mcx = ctx.mcx();
+        let text = assert_framed_round_trip(&Node::mk_expr(mcx, Expr::Var(mk_var())).unwrap());
         // location renders -1 (non-debug WRITE_LOCATION_FIELD); bitmapset is (b).
         assert!(text.starts_with("{VAR :varno 1 :varattno 2 :vartype 23"), "{text}");
         assert!(text.contains(":varnullingrels (b)"), "{text}");
@@ -978,9 +980,11 @@ mod tests {
 
     #[test]
     fn var_with_nullingrels_round_trips() {
-        let mut v = mk_var()?;
+        let mut v = mk_var();
         v.varnullingrels.words = std::vec![0b1010]; // members 1 and 3
-        let text = assert_framed_round_trip(&Node::Expr(Expr::Var(v)));
+        let ctx = MemoryContext::new("var");
+        let mcx = ctx.mcx();
+        let text = assert_framed_round_trip(&Node::mk_expr(mcx, Expr::Var(v)).unwrap());
         assert!(text.contains(":varnullingrels (b 1 3)"), "{text}");
     }
 
@@ -994,12 +998,16 @@ mod tests {
             paramcollid: 0,
             location: -1,
         };
-        let text = assert_framed_round_trip(&Node::Expr(Expr::Param(p)));
+        let ctx = MemoryContext::new("param");
+        let mcx = ctx.mcx();
+        let text = assert_framed_round_trip(&Node::mk_expr(mcx, Expr::Param(p)).unwrap());
         assert!(text.starts_with("{PARAM :paramkind 1 :paramid 5"), "{text}");
     }
 
     #[test]
     fn opexpr_with_args_round_trips() {
+        let ctx = MemoryContext::new("opexpr");
+        let mcx = ctx.mcx();
         // An OpExpr whose two args are Vars (exercises the WRITE_NODE_FIELD
         // arg-list path and the Expr<->Node bridge in both directions).
         let op = OpExpr {
@@ -1009,16 +1017,17 @@ mod tests {
             opretset: false,
             opcollid: 0,
             inputcollid: 0,
-            args: std::vec![Expr::Var(mk_var()?), Expr::Var(mk_var()?)],
+            args: std::vec![Expr::Var(mk_var()), Expr::Var(mk_var())],
             location: -1,
         };
-        let text = assert_framed_round_trip(&Node::Expr(Expr::OpExpr(op)));
+        let text = assert_framed_round_trip(&Node::mk_expr(mcx, Expr::OpExpr(op)).unwrap());
         assert!(text.starts_with("{OPEXPR :opno 96 :opfuncid 65"), "{text}");
         assert!(text.contains(":args ({VAR"), "{text}");
     }
 
     #[test]
     fn funcexpr_empty_args_round_trips() {
+        let ctx = MemoryContext::new("funcexpr");
         let f = FuncExpr {
             funcid: 100,
             funcresulttype: 23,
@@ -1030,19 +1039,21 @@ mod tests {
             args: std::vec![],
             location: -1,
         };
-        let text = assert_framed_round_trip(&Node::Expr(Expr::FuncExpr(f)));
+        let text = assert_framed_round_trip(&Node::mk_expr(ctx.mcx(), Expr::FuncExpr(f)).unwrap());
         assert!(text.contains(":args ()"), "{text}");
     }
 
     #[test]
     fn boolexpr_round_trips() {
         use ::nodes::primnodes::BoolExpr;
+        let ctx = MemoryContext::new("te");
+        let mcx = ctx.mcx();
         let b = BoolExpr {
             boolop: BoolExprType::OR_EXPR,
-            args: std::vec![Expr::Var(mk_var()?)],
+            args: std::vec![Expr::Var(mk_var())],
             location: -1,
         };
-        let text = assert_framed_round_trip(&Node::Expr(Expr::BoolExpr(b)));
+        let text = assert_framed_round_trip(&Node::mk_expr(mcx, Expr::BoolExpr(b)).unwrap());
         assert!(text.starts_with("{BOOLEXPR :boolop or :args"), "{text}");
     }
 
@@ -1051,7 +1062,7 @@ mod tests {
         ensure_seams();
         let ctx = MemoryContext::new("te");
         let mcx = ctx.mcx();
-        let expr = ::mcx::alloc_in(mcx, Expr::Var(mk_var()?)).unwrap();
+        let expr = ::mcx::alloc_in(mcx, Expr::Var(mk_var())).unwrap();
         let resname = ::mcx::PgString::from_str_in("col", mcx).unwrap();
         let te = TargetEntry {
             expr: Some(expr),
@@ -1062,7 +1073,7 @@ mod tests {
             resorigcol: 0,
             resjunk: false,
         };
-        let node = Node::mk_target_entry(mcx, te)?;
+        let node = Node::mk_target_entry(mcx, te).unwrap();
         let text = nodeToString(mcx, &node).unwrap();
         assert!(text.starts_with("{TARGETENTRY :expr {VAR"), "{text}");
         assert!(text.contains(":resname col"), "{text}");
@@ -1088,7 +1099,7 @@ mod tests {
             constbyval: true,
             location: -1,
         };
-        let node = Node::Expr(Expr::Const(konst));
+        let node = Node::mk_expr(mcx, Expr::Const(konst)).unwrap();
         let text = nodeToString(mcx, &node).unwrap();
         assert!(text.starts_with("{CONST :consttype 23"), "{text}");
         assert!(text.contains(":constlen 4"), "{text}");
@@ -1142,7 +1153,7 @@ mod tests {
             constbyval: false,
             location: -1,
         };
-        let node = Node::Expr(Expr::Const(konst));
+        let node = Node::mk_expr(mcx, Expr::Const(konst)).unwrap();
         let text = nodeToString(mcx, &node).unwrap();
         assert!(text.starts_with("{CONST :consttype 25"), "{text}");
         assert!(text.contains(":constbyval false"), "{text}");
@@ -1175,7 +1186,7 @@ mod tests {
             constbyval: true,
             location: -1,
         };
-        let node = Node::Expr(Expr::Const(konst));
+        let node = Node::mk_expr(mcx, Expr::Const(konst)).unwrap();
         let text = nodeToString(mcx, &node).unwrap();
         assert!(text.contains(":constvalue <>"), "{text}");
         let parsed = string_to_node(mcx, text.as_str()).unwrap();

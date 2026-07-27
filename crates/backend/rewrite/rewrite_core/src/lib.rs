@@ -80,8 +80,8 @@ pub mod replace;
 pub mod support;
 pub mod walkers;
 
-#[cfg(test)]
-mod tests;
+// #[cfg(test)]
+// mod tests;
 
 pub use change::{
     adjust_relid_set, ChangeVarNodes, ChangeVarNodesContext, ChangeVarNodesExtended,

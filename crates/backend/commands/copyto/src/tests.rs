@@ -5,6 +5,8 @@
 
 #![cfg(test)]
 
+use types_copy::{CopyLogVerbosityChoice, CopyOnErrorChoice};
+
 use super::*;
 
 #[test]
@@ -42,6 +44,21 @@ fn routine_selection() {
             force_quote: None,
             force_quote_all: false,
             force_quote_flags: PgVec::new_in(mcx),
+            convert_select: None,
+            convert_selectively: false,
+            default_print: Some(PgString::from_str_in("", mcx).unwrap()),
+            default_print_len: 0,
+            force_notnull: None,
+            force_null: None,
+            force_notnull_all: false,
+            force_notnull_flags: PgVec::new_in(mcx),
+            force_null_all: false,
+            force_null_flags: PgVec::new_in(mcx),
+            freeze: false,
+            log_verbosity: CopyLogVerbosityChoice::COPY_LOG_VERBOSITY_DEFAULT,
+            null_print_len: 2,
+            on_error: CopyOnErrorChoice::COPY_ON_ERROR_STOP,
+            reject_limit: 0,
         }
     }
     assert_eq!(copy_to_get_routine(&opts(true, false)), CopyToRoutineKind::Csv);

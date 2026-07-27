@@ -24,7 +24,7 @@ use crate::{
 
 /// A non-null boolean `Const` (the canonical leaf the limit/qual paths see after
 /// const-folding).
-fn bool_const(value: bool) -> Expr {
+fn bool_const<'mcx>(value: bool) -> Expr<'mcx> {
     Expr::Const(nodes_core::makefuncs::make_bool_const(value, false))
 }
 
@@ -34,8 +34,9 @@ fn bool_const(value: bool) -> Expr {
 fn preprocess_expression_target_const_roundtrips() {
     let cx = MemoryContext::new("planner-test");
     let mcx = cx.mcx();
-    let root = PlannerInfo::default();
-    let out = preprocess_expression(mcx, &root, Some(bool_const(true)), EXPRKIND_TARGET)
+    let mut planner_run = PlannerRun::new(mcx);
+    let mut root = PlannerInfo::default();
+    let out = preprocess_expression(mcx, &mut root, &mut planner_run, None, Some(bool_const(true)), EXPRKIND_TARGET)
         .expect("preprocess_expression must not error");
     match out {
         Some(Expr::Const(_)) => {}
@@ -48,8 +49,9 @@ fn preprocess_expression_target_const_roundtrips() {
 fn preprocess_expression_none_is_none() {
     let cx = MemoryContext::new("planner-test2");
     let mcx = cx.mcx();
-    let root = PlannerInfo::default();
-    let out = preprocess_expression(mcx, &root, None, EXPRKIND_QUAL)
+    let mut root = PlannerInfo::default();
+    let mut planner_run = PlannerRun::new(mcx);
+    let out = preprocess_expression(mcx, &mut root, &mut planner_run, None, None, EXPRKIND_QUAL)
         .expect("preprocess_expression must not error");
     assert!(out.is_none());
 }
@@ -62,17 +64,18 @@ fn preprocess_expression_none_is_none() {
 fn preprocess_qual_conditions_fromexpr_qual() {
     let cx = MemoryContext::new("planner-test3");
     let mcx = cx.mcx();
-    let root = PlannerInfo::default();
+    let mut root = PlannerInfo::default();
+    let mut planner_run = PlannerRun::new(mcx);
 
     // FromExpr { fromlist: [], quals: Some(Node::Expr(Const true)) }.
-    let qual = PgBox::new_in(Node::mk_expr(mcx, bool_const(true)), mcx);
+    let qual = PgBox::new_in(Node::mk_expr(mcx, bool_const(true)).unwrap(), mcx);
     let from = FromExpr {
         fromlist: PgVec::new_in(mcx),
         quals: Some(qual),
     };
-    let mut node = Node::mk_from_expr(mcx, from);
+    let mut node = Node::mk_from_expr(mcx, from).unwrap();
 
-    preprocess_qual_conditions(mcx, &root, &mut node)
+    preprocess_qual_conditions(mcx, &mut root, &mut planner_run, None, &mut node)
         .expect("preprocess_qual_conditions must not panic for a Const qual");
 
     match node.into_fromexpr() {
@@ -81,7 +84,7 @@ fn preprocess_qual_conditions_fromexpr_qual() {
             other => panic!("expected re-wrapped Node::Expr(Const) qual, got {other:?}"),
         },
         None => panic!("jointree top must stay a FromExpr"),
-    }
+    };
 }
 
 /// A `RangeTblRef` leaf in the jointree (the single-table FROM shape) has no
@@ -90,9 +93,10 @@ fn preprocess_qual_conditions_fromexpr_qual() {
 fn preprocess_qual_conditions_rangetblref_noop() {
     let cx = MemoryContext::new("planner-test4");
     let mcx = cx.mcx();
-    let root = PlannerInfo::default();
-    let mut node = Node::mk_range_tbl_ref(mcx, RangeTblRef { rtindex: 1 });
-    preprocess_qual_conditions(mcx, &root, &mut node).expect("RangeTblRef leaf must be a no-op");
+    let mut root = PlannerInfo::default();
+    let mut planner_run = PlannerRun::new(mcx);
+    let mut node = Node::mk_range_tbl_ref(mcx, RangeTblRef { rtindex: 1 }).unwrap();
+    preprocess_qual_conditions(mcx, &mut root, &mut planner_run, None, &mut node).expect("RangeTblRef leaf must be a no-op");
 }
 
 // ---------------------------------------------------------------------------
@@ -153,8 +157,10 @@ fn apply_scanjoin_target_same_exprs_injects_sortgrouprefs() {
     // Scan/join target: same exprs, but a nonzero sortgroupref to inject.
     let mut sjt = target_with_exprs(vec![e0]);
     sjt.sortgrouprefs = vec![5u32];
+    let sjts: &[PathTarget] = &[sjt];
+    let contain_srfs: &[bool] = &[false];
 
-    apply_scanjoin_target_to_paths(&run, &mut root, rel, &sjt, /*parallel_safe=*/ true, /*same=*/ true)
+    apply_scanjoin_target_to_paths(&run, &mut root, rel, sjts, contain_srfs, /*parallel_safe=*/ true, /*same=*/ true)
         .expect("apply_scanjoin_target_to_paths must not error");
 
     // The existing path was kept (no projection path created) and its target's

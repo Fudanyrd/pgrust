@@ -284,8 +284,9 @@ fn funccall_reaches_real_logic() {
             func_variadic: false,
             funcformat: CoercionForm::COERCE_EXPLICIT_CALL,
             location: -1,
-        });
-        let _ = transformExprRecurse(&mut pstate, Some(fc));
+        })
+        .unwrap();
+        let _ = transformExprRecurse(&mut pstate, Some(fc).unwrap());
     });
     if let Some(msg) = msg {
         assert_reached_real_logic(&msg);
@@ -303,7 +304,7 @@ fn a_const_null_dispatches_to_make_const() {
     let mut pstate = nodes::parsestmt::ParseState::new(mcx).unwrap();
 
     let aconst = Node::mk_a_const(mcx, A_Const { val: None, isnull: true, location: -1 });
-    let out = transformExprRecurse(&mut pstate, Some(aconst)).unwrap();
+    let out = transformExprRecurse(&mut pstate, Some(aconst.unwrap())).unwrap();
     match out {
         Some(Expr::Const(c)) => {
             assert_eq!(c.consttype, UNKNOWNOID);

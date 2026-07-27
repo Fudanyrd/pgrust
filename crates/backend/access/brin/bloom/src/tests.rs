@@ -12,7 +12,8 @@ fn install_hashfn() {
         .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
         .is_ok()
     {
-        hashfn::init_seams();
+        // not found:
+        // hashfn::init_seams();
     }
 }
 

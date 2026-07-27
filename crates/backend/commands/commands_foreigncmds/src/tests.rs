@@ -22,6 +22,7 @@ fn defelem<'mcx>(mcx: Mcx<'mcx>, name: &str, action: DefElemAction) -> DefElem<'
         defname: PgString::from_str_in(name, mcx).unwrap(),
         arg: None,
         defaction: action,
+        location: -1,
     }
 }
 

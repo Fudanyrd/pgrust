@@ -22,9 +22,9 @@ fn install_seams() {
         });
         mb::pg_mbstrlen_with_len::set(|s, limit| {
             let lim = (limit.max(0) as usize).min(s.len());
-            core::str::from_utf8(&s[..lim])
+            Ok(core::str::from_utf8(&s[..lim])
                 .map(|t| t.chars().count() as i32)
-                .unwrap_or(lim as i32)
+                .unwrap_or(lim as i32))
         });
     });
 }

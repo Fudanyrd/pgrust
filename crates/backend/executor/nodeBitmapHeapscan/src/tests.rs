@@ -1,7 +1,7 @@
 //! Unit tests for the bitmap-heap-scan node's owned, seam-free logic.
 
 use super::*;
-use nodes::SpinLockGuard;
+use self::nodes::SpinLockGuard;
 use ::types_storage::Spinlock;
 
 #[test]

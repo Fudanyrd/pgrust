@@ -13,7 +13,7 @@ use crate::fold::eval_const_expressions;
 use crate::grounded::{contain_subplans_slice, contain_window_function};
 
 /// A non-null boolean `Const` of the given value.
-fn bool_const(value: bool) -> Expr {
+fn bool_const<'a>(value: bool) -> Expr<'a> {
     Expr::Const(nodes_core::makefuncs::make_bool_const(value, false))
 }
 
@@ -114,6 +114,7 @@ fn contain_subplans_finds_sublink() {
         testexpr: None,
         subselect: None,
         location: -1,
+        operName: vec![],
     });
     let exprs2 = [bool_const(true), sublink];
     assert!(contain_subplans_slice(&exprs2));

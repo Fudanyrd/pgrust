@@ -246,7 +246,7 @@ fn install_mocks() {
 
 // --- plan / state fixtures ------------------------------------------------
 
-fn funcexpr(funcretset: bool) -> FuncExpr {
+fn funcexpr<'a>(funcretset: bool) -> FuncExpr<'a> {
     FuncExpr {
         funcid: 0,
         funcresulttype: 0,
@@ -260,24 +260,24 @@ fn funcexpr(funcretset: bool) -> FuncExpr {
     }
 }
 
-fn srf_funcexpr() -> Expr {
+fn srf_funcexpr<'a>() -> Expr<'a> {
     Expr::FuncExpr(funcexpr(true))
 }
 
-fn srf_opexpr() -> Expr {
+fn srf_opexpr<'a>() -> Expr<'a> {
     Expr::OpExpr(OpExpr {
         opretset: true,
         ..Default::default()
     })
 }
 
-fn plain_const() -> Expr {
+fn plain_const<'a>() -> Expr<'a> {
     Expr::Const(Const::default())
 }
 
 /// Build a `ProjectSet` plan node whose targetlist carries the given column
 /// expressions (each `te->expr`).
-fn make_projectset_plan<'mcx>(mcx: Mcx<'mcx>, exprs: &[Expr]) -> PgResult<Node<'mcx>> {
+fn make_projectset_plan<'mcx>(mcx: Mcx<'mcx>, exprs: &[Expr<'mcx>]) -> PgResult<Node<'mcx>> {
     let mut plan = ProjectSetPlan::default();
     let mut tl = ::mcx::vec_with_capacity_in(mcx, exprs.len())?;
     for e in exprs {
@@ -286,7 +286,7 @@ fn make_projectset_plan<'mcx>(mcx: Mcx<'mcx>, exprs: &[Expr]) -> PgResult<Node<'
         tl.push(te);
     }
     plan.plan.targetlist = Some(tl);
-    Ok(Node::mk_project_set(mcx, plan))
+    Ok(Node::mk_project_set(mcx, plan)?)
 }
 
 /// Initialize a `ProjectSetState` with the given tlist column expressions and

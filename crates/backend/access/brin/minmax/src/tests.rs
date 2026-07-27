@@ -313,18 +313,30 @@ fn consistent_equal_two_call_short_circuit() {
     };
 
     // = 15: 10 <= 15 (true) AND 20 >= 15 (true) => match.
-    assert!(brin_minmax_consistent(&bdesc, &col, &key(BT_EQUAL_STRATEGY_NUMBER, 15), 0).unwrap());
+    assert!(
+        brin_minmax_consistent(mcx, &bdesc, &col, &key(BT_EQUAL_STRATEGY_NUMBER, 15), 0).unwrap()
+    );
     // = 5: 10 <= 5 is false => short-circuit, no match.
-    assert!(!brin_minmax_consistent(&bdesc, &col, &key(BT_EQUAL_STRATEGY_NUMBER, 5), 0).unwrap());
+    assert!(
+        !brin_minmax_consistent(mcx, &bdesc, &col, &key(BT_EQUAL_STRATEGY_NUMBER, 5), 0).unwrap()
+    );
     // = 25: 10 <= 25 (true) but 20 >= 25 is false => no match.
-    assert!(!brin_minmax_consistent(&bdesc, &col, &key(BT_EQUAL_STRATEGY_NUMBER, 25), 0).unwrap());
+    assert!(
+        !brin_minmax_consistent(mcx, &bdesc, &col, &key(BT_EQUAL_STRATEGY_NUMBER, 25), 0).unwrap()
+    );
 
     // < 25: min(10) < 25 => match. < 5: min(10) < 5 false.
-    assert!(brin_minmax_consistent(&bdesc, &col, &key(BT_LESS_STRATEGY_NUMBER, 25), 0).unwrap());
-    assert!(!brin_minmax_consistent(&bdesc, &col, &key(BT_LESS_STRATEGY_NUMBER, 5), 0).unwrap());
+    assert!(
+        brin_minmax_consistent(mcx, &bdesc, &col, &key(BT_LESS_STRATEGY_NUMBER, 25), 0).unwrap()
+    );
+    assert!(
+        !brin_minmax_consistent(mcx, &bdesc, &col, &key(BT_LESS_STRATEGY_NUMBER, 5), 0).unwrap()
+    );
 
     // > 15: max(20) > 15 => match.
-    assert!(brin_minmax_consistent(&bdesc, &col, &key(BT_GREATER_STRATEGY_NUMBER, 15), 0).unwrap());
+    assert!(
+        brin_minmax_consistent(mcx, &bdesc, &col, &key(BT_GREATER_STRATEGY_NUMBER, 15), 0).unwrap()
+    );
 }
 
 #[test]
@@ -344,7 +356,7 @@ fn consistent_invalid_strategy_errors() {
         sk_argument: d(1),
         sk_subkeys: None,
     };
-    assert!(brin_minmax_consistent(&bdesc, &col, &key, 0).is_err());
+    assert!(brin_minmax_consistent(mcx, &bdesc, &col, &key, 0).is_err());
 }
 
 #[test]
@@ -359,14 +371,15 @@ fn strategy_cache_invalidated_on_subtype_change() {
     };
 
     // First lookup at subtype 23 caches the LESS slot.
-    let f = minmax_get_strategy_procinfo(&bdesc, opaque, 1, INT4OID, BT_LESS_STRATEGY_NUMBER).unwrap();
+    let f =
+        minmax_get_strategy_procinfo(&bdesc, opaque, 1, INT4OID, BT_LESS_STRATEGY_NUMBER).unwrap();
     assert_eq!(f, FN_INT4_LT);
     assert_eq!(opaque.cached_subtype.get(), INT4OID);
     assert_eq!(opaque.strategy_procinfos[0].get(), FN_INT4_LT);
 
     // Same subtype: GREATER slot fills, LESS stays.
-    let g =
-        minmax_get_strategy_procinfo(&bdesc, opaque, 1, INT4OID, BT_GREATER_STRATEGY_NUMBER).unwrap();
+    let g = minmax_get_strategy_procinfo(&bdesc, opaque, 1, INT4OID, BT_GREATER_STRATEGY_NUMBER)
+        .unwrap();
     assert_eq!(g, FN_INT4_GT);
     assert_eq!(opaque.strategy_procinfos[0].get(), FN_INT4_LT);
 
@@ -378,7 +391,10 @@ fn strategy_cache_invalidated_on_subtype_change() {
     assert_eq!(f2, FN_INT4_LT);
     assert_eq!(opaque.cached_subtype.get(), other_subtype);
     // GREATER slot was invalidated by the subtype change.
-    assert_eq!(opaque.strategy_procinfos[BT_GREATER_STRATEGY_NUMBER as usize - 1].get(), INVALID_OID);
+    assert_eq!(
+        opaque.strategy_procinfos[BT_GREATER_STRATEGY_NUMBER as usize - 1].get(),
+        INVALID_OID
+    );
 }
 
 #[test]

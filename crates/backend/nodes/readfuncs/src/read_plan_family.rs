@@ -1643,7 +1643,7 @@ mod tests {
             scan: ::nodes::nodeindexscan::Scan::default(),
         };
         s.scan.scanrelid = 3;
-        let text = assert_framed_round_trip(&Node::mk_seq_scan(mcx, s)?);
+        let text = assert_framed_round_trip(&Node::mk_seq_scan(mcx, s).unwrap());
         assert!(text.starts_with("{SEQSCAN :scan.plan.disabled_nodes 0"), "{text}");
         assert!(text.contains(":scan.plan.targetlist <>"), "{text}");
         assert!(text.ends_with(":scan.scanrelid 3}"), "{text}");
@@ -1669,7 +1669,7 @@ mod tests {
         pco.push(0u32);
         w.partCollations = Some(pco);
         w.topWindow = true;
-        let text = assert_framed_round_trip(&Node::mk_window_agg(mcx, w)?);
+        let text = assert_framed_round_trip(&Node::mk_window_agg(mcx, w).unwrap());
         assert!(text.starts_with("{WINDOWAGG :plan.disabled_nodes 0"), "{text}");
         assert!(text.contains(":winname w "), "{text}");
         assert!(text.ends_with(":topWindow true}"), "{text}");
@@ -1697,7 +1697,7 @@ mod tests {
             tablefunc: alloc_in(mcx, tf).unwrap(),
         };
         s.scan.scanrelid = 4;
-        let text = assert_framed_round_trip(&Node::mk_table_func_scan(mcx, s)?);
+        let text = assert_framed_round_trip(&Node::mk_table_func_scan(mcx, s).unwrap());
         assert!(text.starts_with("{TABLEFUNCSCAN :scan.plan.disabled_nodes 0"), "{text}");
         assert!(text.contains(":tablefunc {TABLEFUNC :functype 0"), "{text}");
         assert!(text.contains(":colnames (\"c1\")"), "{text}");
@@ -1738,7 +1738,7 @@ mod tests {
         };
         s.scan.plan.initPlan = Some(init);
         s.scan.scanrelid = 1;
-        let text = assert_framed_round_trip(&Node::mk_seq_scan(mcx, s)?);
+        let text = assert_framed_round_trip(&Node::mk_seq_scan(mcx, s).unwrap());
         assert!(text.contains("initPlan ({SUBPLAN :subLinkType"), "{text}");
         assert!(text.contains(":plan_id 7"), "{text}");
 
@@ -1783,7 +1783,7 @@ mod tests {
             funcordinality: true,
         };
         fs.scan.scanrelid = 5;
-        let text = assert_framed_round_trip(&Node::mk_function_scan(mcx, fs)?);
+        let text = assert_framed_round_trip(&Node::mk_function_scan(mcx, fs).unwrap());
         assert!(text.starts_with("{FUNCTIONSCAN :scan.plan.disabled_nodes 0"), "{text}");
         assert!(text.contains(":functions ({RANGETBLFUNCTION"), "{text}");
         assert!(text.ends_with(":funcordinality true}"), "{text}");
@@ -1800,8 +1800,8 @@ mod tests {
         let mut m = ::nodes::nodeforeigncustom::Material {
             plan: ::nodes::nodeindexscan::Plan::default(),
         };
-        m.plan.lefttree = Some(::mcx::alloc_in(mcx, child).unwrap());
-        let text = assert_framed_round_trip(&Node::mk_material(mcx, m)?);
+        m.plan.lefttree = Some(::mcx::alloc_in(mcx, child.unwrap()).unwrap());
+        let text = assert_framed_round_trip(&Node::mk_material(mcx, m).unwrap());
         assert!(text.starts_with("{MATERIAL :plan.disabled_nodes 0"), "{text}");
         assert!(text.contains(":plan.lefttree {SEQSCAN"), "{text}");
     }
@@ -1835,12 +1835,12 @@ mod tests {
         let s = ::nodes::nodesort::Sort {
             plan: ::nodes::nodeindexscan::Plan::default(),
             numCols: 2,
-            sortColIdx: mk_i16(&[1, 2])?,
-            sortOperators: mk_u32(&[97, 521])?,
-            collations: mk_u32(&[0, 100])?,
-            nullsFirst: mk_bool(&[false, true])?,
+            sortColIdx: mk_i16(&[1, 2]),
+            sortOperators: mk_u32(&[97, 521]),
+            collations: mk_u32(&[0, 100]),
+            nullsFirst: mk_bool(&[false, true]),
         };
-        let text = assert_framed_round_trip(&Node::mk_sort(mcx, s)?);
+        let text = assert_framed_round_trip(&Node::mk_sort(mcx, s).unwrap());
         assert!(text.contains(":numCols 2"), "{text}");
         assert!(text.contains(":sortColIdx ( 1 2)"), "{text}");
         assert!(text.contains(":sortOperators ( 97 521)"), "{text}");
@@ -1854,7 +1854,7 @@ mod tests {
         // NIL nestParams → `<>`.
         let mut nl = ::nodes::nodenestloop::NestLoop::default();
         nl.join.jointype = JoinType::JOIN_INNER;
-        let text = assert_framed_round_trip(&Node::mk_nest_loop(mcx, nl)?);
+        let text = assert_framed_round_trip(&Node::mk_nest_loop(mcx, nl).unwrap());
         assert!(text.starts_with("{NESTLOOP :join.plan.disabled_nodes 0"), "{text}");
         assert!(text.ends_with(":nestParams <>}"), "{text}");
     }
@@ -1886,7 +1886,7 @@ mod tests {
                 paramval: ::nodes::primnodes::Expr::Var(v2),
             },
         ];
-        let text = assert_framed_round_trip(&Node::mk_nest_loop(mcx, nl)?);
+        let text = assert_framed_round_trip(&Node::mk_nest_loop(mcx, nl).unwrap());
         assert!(
             text.contains(":nestParams ({NESTLOOPPARAM :paramno 0 :paramval {VAR :varno 1"),
             "{text}"

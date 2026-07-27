@@ -1485,7 +1485,7 @@ mod tests {
         let mcx = ctx.mcx();
 
         let te = ::nodes::primnodes::TargetEntry {
-            expr: Some(::mcx::alloc_in(mcx, Expr::Var(mk_var()?)).expect("alloc")),
+            expr: Some(::mcx::alloc_in(mcx, Expr::Var(mk_var())).expect("alloc")),
             resno: 1,
             resname: None,
             ressortgroupref: 1,
@@ -1523,7 +1523,7 @@ mod tests {
             aggtransno: -1,
             location: -1,
         };
-        let node = Node::mk_expr(mcx, Expr::Aggref(aggref))?;
+        let node = Node::mk_expr(mcx, Expr::Aggref(aggref)).unwrap();
 
         let text = ::outfuncs::nodeToString(mcx, &node).expect("out");
         let parsed = string_to_node(mcx, text.as_str()).expect("read");
@@ -1620,7 +1620,7 @@ mod tests {
         let sublink = Expr::SubLink(::nodes::primnodes::SubLink {
             subLinkType: ::nodes::primnodes::SubLinkType::Any,
             subLinkId: 3,
-            testexpr: Some(std::boxed::Box::new(Expr::Var(mk_var()?))),
+            testexpr: Some(std::boxed::Box::new(Expr::Var(mk_var()))),
             // ANY sublink carries an operName like `("=")`; it must survive the
             // out/read round-trip (the bug this exercises: the reader formerly
             // consumed only the `<>` token, misaligning on the real `("=")` list).
@@ -1628,7 +1628,7 @@ mod tests {
             subselect,
             location: -1,
         });
-        let node = Node::mk_expr(mcx, sublink)?;
+        let node = Node::mk_expr(mcx, sublink).unwrap();
 
         let text = ::outfuncs::nodeToString(mcx, &node).expect("out");
         let parsed = string_to_node(mcx, text.as_str()).expect("read");
@@ -1688,7 +1688,7 @@ mod tests {
             argisrow: false,
             location: 5,
         };
-        let node = Node::mk_null_test(mcx, n)?;
+        let node = Node::mk_null_test(mcx, n).unwrap();
         let mut buf = String::new();
         out_node(&mut buf, &node);
         // location renders -1 (non-debug WRITE_LOCATION_FIELD via out_node).
@@ -1708,14 +1708,14 @@ mod tests {
             cursor_name: Some(PgString::from_str_in("c1", mcx).unwrap()),
             cursor_param: 0,
         };
-        let node = Node::mk_current_of_expr(mcx, n)?;
+        let node = Node::mk_current_of_expr(mcx, n).unwrap();
         let mut buf = String::new();
         out_node(&mut buf, &node);
         assert_eq!(
             buf,
             "{CURRENTOFEXPR :cvarno 3 :cursor_name c1 :cursor_param 0}".to_string()
         );
-        let _ = mk_var()?; // keep helper referenced
+        let _ = mk_var(); // keep helper referenced
     }
 }
 

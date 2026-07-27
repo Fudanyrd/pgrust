@@ -112,7 +112,7 @@ fn sync_method_ops_shape() {
     assert!(ops.init_backend.is_none());
     let h = PgAioHandle::zeroed();
     assert!((ops.needs_synchronous_execution.unwrap())(&h));
-    let err = (ops.submit.unwrap())(0).unwrap_err();
+    let err = (ops.submit.unwrap())(&[0]).unwrap_err();
     assert!(err.message().contains("executed synchronously"));
 }
 

@@ -319,7 +319,8 @@ fn init_leader_path_creates_shared_store_and_runs_setup() {
             ctePlanId: 1,
             cteParam: 0,
             ..Default::default()
-        }),
+        })
+        .unwrap(),
     )
     .unwrap();
     let mut estate = estate(ctx.mcx());
@@ -349,7 +350,8 @@ fn init_follower_path_allocs_own_read_pointer() {
             ctePlanId: 1,
             cteParam: 0,
             ..Default::default()
-        }),
+        })
+        .unwrap(),
     )
     .unwrap();
     let mut estate = estate(ctx.mcx());

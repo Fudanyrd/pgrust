@@ -144,6 +144,8 @@ fn state_with_line<'mcx>(
         relname_only: false,
         cur_attname: None,
         cur_attval: None,
+        qualexpr: None,
+        where_clause: PgVec::new_in(mcx),
     }
 }
 

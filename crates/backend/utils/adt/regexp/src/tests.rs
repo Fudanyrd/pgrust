@@ -174,8 +174,8 @@ fn install() {
         engine::pg_regprefix::set(test_regprefix);
         engine::pg_regfree::set(test_regfree);
         mb::pg_database_encoding_max_length::set(|| 1);
-        mb::pg_mbstrlen_with_len::set(|s, limit| (limit.max(0) as usize).min(s.len()) as i32);
-        mb::pg_mblen_range::set(|_| 1);
+        mb::pg_mbstrlen_with_len::set(|s, limit| Ok((limit.max(0) as usize).min(s.len()) as i32));
+        mb::pg_mblen_range::set(|_| Ok(1));
         mb::pg_mb2wchar_with_len::set(test_mb2wchar);
         mb::pg_wchar2mb_with_len::set(test_wchar2mb);
         varlena_seams::text_substr::set(test_text_substr);

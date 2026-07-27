@@ -219,6 +219,7 @@ fn push_econtext<'mcx>(estate: &mut EStateData<'mcx>) -> ::nodes::EcxtId {
         domainValue_datum: Datum::default(),
         domainValue_isNull: false,
         ecxt_callbacks: None,
+        ecxt_param_list_info: None,
     };
     estate.add_expr_context(ecxt).expect("add ExprContext")
 }
@@ -227,7 +228,7 @@ fn push_econtext<'mcx>(estate: &mut EStateData<'mcx>) -> ::nodes::EcxtId {
 /// wraps). The args are empty here so `ExecEvalFuncArgs` is a no-op; the test
 /// pre-populates the call frame's args directly (the value-per-call loop and the
 /// SRF body are what is under test, not arg compilation).
-fn srf_funcexpr() -> Expr {
+fn srf_funcexpr<'mcx>() -> Expr<'mcx> {
     Expr::FuncExpr(FuncExpr {
         funcid: TEST_SRF_OID,
         funcresulttype: INT4OID,

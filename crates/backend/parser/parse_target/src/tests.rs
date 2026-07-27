@@ -27,7 +27,8 @@ fn figure_colname_columnref_last_field() {
     let cref = Node::mk_column_ref(mcx, ColumnRef {
         fields,
         location: -1,
-    });
+    })
+    .unwrap();
     assert_eq!(FigureColname(Some(&cref)).as_deref(), Some("mycol"));
 }
 
@@ -69,6 +70,7 @@ fn figure_colname_grouping() {
         cols: PgVec::new_in(mcx),
         agglevelsup: 0,
         location: -1,
-    });
+    })
+    .unwrap();
     assert_eq!(FigureColname(Some(&gf)).as_deref(), Some("grouping"));
 }

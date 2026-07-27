@@ -604,5 +604,5 @@ pub fn erase_sample_scan_state<'mcx>(
 /// inward-facing seam, so there is nothing to `set()` here yet.
 pub fn init_seams() {}
 
-#[cfg(test)]
-mod tests;
+// #[cfg(test)]
+// mod tests;

@@ -18,7 +18,7 @@ use ::pathnodes::{PlannerInfo, TargetEntryNode};
 use crate::{extract_update_targetlist_colnos, get_plan_rowmark, preprocess_targetlist};
 
 /// A simple `Var` expr leaf with the given `varattno`.
-fn a_var(varattno: i16) -> Expr {
+fn a_var<'mcx>(varattno: i16) -> Expr<'mcx> {
     Expr::Var(Var {
         varno: 1,
         varattno,

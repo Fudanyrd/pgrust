@@ -2689,7 +2689,7 @@ mod tests {
             defaction: dn::DefElemAction::DEFELEM_SET,
             location: -1,
         };
-        let text = rt(&Node::mk_def_elem(mcx, de)?);
+        let text = rt(&Node::mk_def_elem(mcx, de).unwrap());
         assert!(text.starts_with("{DEFELEM :defnamespace <> :defname oids"), "{}", text);
         assert!(text.contains(":defaction 1"), "{}", text);
     }
@@ -2703,7 +2703,7 @@ mod tests {
             rolename: Some(PgString::from_str_in("alice", mcx).unwrap()),
             location: -1,
         };
-        let text = rt(&Node::mk_role_spec(mcx, rs)?);
+        let text = rt(&Node::mk_role_spec(mcx, rs).unwrap());
         assert!(text.starts_with("{ROLESPEC :roletype 0 :rolename alice"), "{}", text);
     }
 
@@ -2718,7 +2718,7 @@ mod tests {
             missing_ok: true,
             concurrent: false,
         };
-        let text = rt(&Node::mk_drop_stmt(mcx, ds)?);
+        let text = rt(&Node::mk_drop_stmt(mcx, ds).unwrap());
         assert!(text.starts_with("{DROPSTMT :objects <>"), "{}", text);
         assert!(text.contains(":behavior 0 :missing_ok true :concurrent false"), "{}", text);
     }
@@ -2731,7 +2731,7 @@ mod tests {
             conditionname: Some(PgString::from_str_in("chan", mcx).unwrap()),
             payload: None,
         };
-        let text = rt(&Node::mk_notify_stmt(mcx, ns)?);
+        let text = rt(&Node::mk_notify_stmt(mcx, ns).unwrap());
         assert!(text.starts_with("{NOTIFYSTMT :conditionname chan :payload <>"), "{}", text);
     }
 
@@ -2750,7 +2750,7 @@ mod tests {
             upperdatums: PgVec::new_in(mcx),
             location: -1,
         };
-        let text = rt(&Node::mk_partition_bound_spec(mcx, pbs)?);
+        let text = rt(&Node::mk_partition_bound_spec(mcx, pbs).unwrap());
         assert!(text.starts_with("{PARTITIONBOUNDSPEC :strategy h :is_default false :modulus 4 :remainder 1"), "{}", text);
     }
 }

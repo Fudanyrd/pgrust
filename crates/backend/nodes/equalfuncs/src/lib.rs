@@ -3631,7 +3631,7 @@ mod tests {
     use ::nodes::primnodes::{Const, OpExpr, Var};
     use types_tuple::heaptuple::Datum;
 
-    fn var(varno: i32, varattno: i16) -> Expr {
+    fn var<'a>(varno: i32, varattno: i16) -> Expr<'a> {
         Expr::Var(Var {
             varno,
             varattno,

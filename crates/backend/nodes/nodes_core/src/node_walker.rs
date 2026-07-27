@@ -1874,7 +1874,7 @@ mod tests {
     use ::nodes::rawnodes::{FromExpr, JoinExpr};
     use ::nodes::jointype::JoinType;
 
-    fn op_with_two_vars() -> Expr {
+    fn op_with_two_vars<'a>() -> Expr<'a> {
         Expr::OpExpr(OpExpr {
             args: vec![Expr::Var(Var::default()), Expr::Var(Var::default())],
             ..OpExpr::default()
@@ -1883,8 +1883,10 @@ mod tests {
 
     #[test]
     fn node_walker_recurses_expr_children() {
+        let ctx = mcx::MemoryContext::new("t");
+        let mcx = ctx.mcx();
         // OpExpr with two Var children: walker should see exactly 2 children.
-        let node = Node::Expr(op_with_two_vars());
+        let node = Node::mk_expr(mcx, op_with_two_vars()).unwrap();
         let mut count = 0;
         let aborted = expression_tree_walker(&node, &mut |c: &Node| {
             assert!(c.is_var());
@@ -1897,7 +1899,9 @@ mod tests {
 
     #[test]
     fn node_walker_abort_stops_early() {
-        let node = Node::Expr(op_with_two_vars());
+        let ctx = mcx::MemoryContext::new("t");
+        let mcx = ctx.mcx();
+        let node = Node::mk_expr(mcx, op_with_two_vars()).unwrap();
         let mut count = 0;
         let aborted = expression_tree_walker(&node, &mut |_c: &Node| {
             count += 1;
@@ -1913,12 +1917,13 @@ mod tests {
         use ::nodes::value::{BitString, Boolean, Float, Integer, StringNode};
         let ctx = mcx::MemoryContext::new("t");
         let mcx = ctx.mcx();
-        assert_eq!(Node::mk_integer(mcx, Integer { ival: 7 }).tag(), T_Integer);
-        assert_eq!(Node::mk_boolean(mcx, Boolean { boolval: true }).tag(), T_Boolean);
+        assert_eq!(Node::mk_integer(mcx, Integer { ival: 7 }).unwrap().tag(), T_Integer);
+        assert_eq!(Node::mk_boolean(mcx, Boolean { boolval: true }).unwrap().tag(), T_Boolean);
         assert_eq!(
             Node::mk_float(mcx, Float {
                 fval: mcx::PgString::from_str_in("1.5", mcx).unwrap()
             })
+            .unwrap()
             .tag(),
             T_Float
         );
@@ -1926,6 +1931,7 @@ mod tests {
             Node::mk_string(mcx, StringNode {
                 sval: mcx::PgString::from_str_in("x", mcx).unwrap()
             })
+            .unwrap()
             .tag(),
             T_String
         );
@@ -1933,11 +1939,12 @@ mod tests {
             Node::mk_bit_string(mcx, BitString {
                 bsval: mcx::PgString::from_str_in("b101", mcx).unwrap()
             })
+            .unwrap()
             .tag(),
             T_BitString
         );
         // value nodes are leaves: no children walked
-        let node = Node::mk_integer(mcx, Integer { ival: 7 });
+        let node = Node::mk_integer(mcx, Integer { ival: 7 }).unwrap();
         assert!(!expression_tree_walker(&node, &mut |_c| panic!("leaf has no children")));
     }
 
@@ -1954,18 +1961,19 @@ mod tests {
             rarg: None,
             usingClause: mcx::PgVec::new_in(mcx),
             join_using_alias: None,
-            quals: Some(mcx::alloc_in(mcx, Node::mk_expr(mcx, op_with_two_vars())).unwrap()),
+            quals: Some(mcx::alloc_in(mcx, Node::mk_expr(mcx, op_with_two_vars()).unwrap()).unwrap()),
             alias: None,
             rtindex: 0,
-        });
+        })
+        .unwrap();
 
         let mut fromlist = mcx::PgVec::new_in(mcx);
         fromlist.push(mcx::alloc_in(mcx, join).unwrap());
         let from = FromExpr {
             fromlist,
-            quals: Some(mcx::alloc_in(mcx, Node::mk_expr(mcx, Expr::Var(Var::default()))).unwrap()),
+            quals: Some(mcx::alloc_in(mcx, Node::mk_expr(mcx, Expr::Var(Var::default())).unwrap()).unwrap()),
         };
-        let node = Node::mk_from_expr(mcx, from);
+        let node = Node::mk_from_expr(mcx, from).unwrap();
 
         // Top-level children: the JoinExpr and the quals Var.
         let mut tags = Vec::new();
@@ -1981,7 +1989,7 @@ mod tests {
     /// `Clone` is a deliberate panic-stub, so any read-only walk that wraps it
     /// via a bare `.clone()` aborts; this is the exact node the `count(*)`
     /// target list carries.
-    fn count_star_aggref() -> Expr {
+    fn count_star_aggref<'a>() -> Expr<'a> {
         use ::nodes::nodeagg::AggSplit;
         use ::nodes::primnodes::Aggref;
         Expr::Aggref(Aggref {
@@ -2075,7 +2083,7 @@ mod tests {
         // Mutate each Var child's varno via the in-place Node walker.
         let ctx = mcx::MemoryContext::new("t");
         let mcx = ctx.mcx();
-        let mut node = Node::Expr(op_with_two_vars());
+        let mut node = Node::mk_expr(mcx, op_with_two_vars()).unwrap();
         let aborted = expression_tree_walker_mut(&mut node, &mut |c: &mut Node| {
             if let Some(v) = c.as_var_mut() {
                 v.varno = 42;
