@@ -113,15 +113,14 @@ fn empty_bms(mcx: Mcx<'_>) -> PgResult<PgBox<'_, Bitmapset<'_>>> {
 #[test]
 fn exec_re_scan_walks_params_and_dispatches() {
     install_mocks();
-    let cx = MemoryContext::new("exec_re_scan test");
-    let mcx = cx.mcx();
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("t"))).mcx();
     // The InitPlan's subselect plan node: declared before the EState so the
     // state tree's borrowed plan back-link outlives it. plan->extParam is
     // non-NULL to drive UpdateChangedParamSet.
     let mut splan_plan = Material::default();
     splan_plan.plan.extParam = Some(empty_bms(mcx).unwrap());
-    let splan_plan = ::nodes::nodes::Node::mk_material(mcx, splan_plan).unwrap();
-    let child_plan = ::nodes::nodes::Node::mk_material(mcx, Material::default()).unwrap();
+    let splan_plan: &'static ::nodes::nodes::Node = Box::leak(Box::new(::nodes::nodes::Node::mk_material(mcx, splan_plan).unwrap()));
+    let child_plan: &'static ::nodes::nodes::Node = Box::leak(Box::new(::nodes::nodes::Node::mk_material(mcx, Material::default()).unwrap()));
 
     let mut estate = EStateData::new_in(mcx);
     let slot = estate.make_slot(TupleTableSlot::new_in(estate.es_query_cxt)).unwrap();
