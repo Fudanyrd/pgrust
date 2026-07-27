@@ -14,7 +14,7 @@
 
 use std::sync::Once;
 
-use ::mcx::MemoryContext;
+use ::mcx::{MemoryContext, Mcx};
 use ::nodes::nodes::Node;
 use ::nodes::primnodes::Var;
 use ::nodes::rawnodes::RangeTblFunction;
@@ -93,7 +93,7 @@ fn setup() {
 fn simple_function_scan<'mcx>(mcx: ::mcx::Mcx<'mcx>) -> Node<'mcx> {
     // funcexpr: a trivial Expr node (the mocked ExecInitTableFunctionResult
     // never inspects it beyond `as_expr`).
-    let funcexpr = ::mcx::alloc_in(mcx, Node::mk_var(mcx, Var::default())).unwrap();
+    let funcexpr = ::mcx::alloc_in(mcx, Node::mk_var(mcx, Var::default()).unwrap()).unwrap();
 
     // funccolnames = list_make1(makeString("c")).
     let mut funccolnames: PgVec<'mcx, ::nodes::nodes::NodePtr<'mcx>> = PgVec::new_in(mcx);
@@ -105,7 +105,8 @@ fn simple_function_scan<'mcx>(mcx: ::mcx::Mcx<'mcx>) -> Node<'mcx> {
                 StringNode {
                     sval: ::mcx::PgString::from_str_in("c", mcx).unwrap(),
                 },
-            ),
+            )
+            .unwrap(),
         )
         .unwrap(),
     );
@@ -138,14 +139,15 @@ fn simple_function_scan<'mcx>(mcx: ::mcx::Mcx<'mcx>) -> Node<'mcx> {
             funcordinality: false,
         },
     )
+    .unwrap()
 }
 
 #[test]
 fn init_builds_simple_function_scan_state() {
     setup();
-    let ctx = MemoryContext::new("per-query");
-    let mcx = ctx.mcx();
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("per-query"))).mcx();
     let node = ::mcx::alloc_in(mcx, simple_function_scan(mcx)).unwrap();
+    let node: &'static Node = Box::leak(Box::new(node));
     let mut estate = EStateData::new_in(mcx);
 
     let scanstate = ExecInitFunctionScan(&node, &mut estate, 0).unwrap();
@@ -172,9 +174,9 @@ fn init_builds_simple_function_scan_state() {
 #[test]
 fn plan_state_node_function_scan_downcast() {
     setup();
-    let ctx = MemoryContext::new("per-query");
-    let mcx = ctx.mcx();
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("per-query"))).mcx();
     let node = ::mcx::alloc_in(mcx, simple_function_scan(mcx)).unwrap();
+    let node: &'static Node = Box::leak(Box::new(node));
     let mut estate = EStateData::new_in(mcx);
 
     let scanstate = ExecInitFunctionScan(&node, &mut estate, 0).unwrap();
@@ -201,9 +203,9 @@ fn plan_state_node_function_scan_downcast() {
 #[test]
 fn end_releases_state_without_tuplestores() {
     setup();
-    let ctx = MemoryContext::new("per-query");
-    let mcx = ctx.mcx();
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("per-query"))).mcx();
     let node = ::mcx::alloc_in(mcx, simple_function_scan(mcx)).unwrap();
+    let node: &'static Node = Box::leak(Box::new(node));
     let mut estate = EStateData::new_in(mcx);
 
     let mut scanstate = ExecInitFunctionScan(&node, &mut estate, 0).unwrap();
@@ -221,9 +223,9 @@ fn runtime_srf_call_hits_documented_k2_seam_boundary() {
     // declared loud panic. This proves the runtime path is a genuine documented
     // seam-panic into the K2 owner — NOT a fake row / todo!.
     setup();
-    let ctx = MemoryContext::new("per-query");
-    let mcx = ctx.mcx();
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("per-query"))).mcx();
     let node = ::mcx::alloc_in(mcx, simple_function_scan(mcx)).unwrap();
+    let node: &'static Node = Box::leak(Box::new(node));
     let mut estate = EStateData::new_in(mcx);
 
     let mut scanstate = ExecInitFunctionScan(&node, &mut estate, 0).unwrap();
