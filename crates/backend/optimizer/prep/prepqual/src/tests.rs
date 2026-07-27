@@ -171,7 +171,7 @@ fn canonicalize_empty_qual_is_none() {
 fn canonicalize_or_with_true_const_reduces_to_true() {
     // WHERE: OR(x, true) -> Const TRUE
     let q = or_of(vec![leaf(1), bool_const(true)]);
-    let cx = mcx::MemoryContext::new("prepqual-test");
+    let cx = Box::leak(Box::new(mcx::MemoryContext::new("prepqual-test")));
     let mcx = cx.mcx();
     let r = super::canonicalize_qual(mcx, Some(q), false)
         .expect("canon")
@@ -185,7 +185,7 @@ fn canonicalize_or_with_true_const_reduces_to_true() {
 fn canonicalize_and_with_false_const_reduces_to_false() {
     // WHERE: AND(x, false) -> Const FALSE
     let q = and_of(vec![leaf(1), bool_const(false)]);
-    let cx = mcx::MemoryContext::new("prepqual-test");
+    let cx = Box::leak(Box::new(mcx::MemoryContext::new("prepqual-test")));
     let mcx = cx.mcx();
     let r = super::canonicalize_qual(mcx, Some(q), false)
         .expect("canon")
@@ -199,7 +199,7 @@ fn canonicalize_and_with_false_const_reduces_to_false() {
 fn canonicalize_and_drops_true_const() {
     // WHERE: AND(x, true) -> x  (single-element AND reduces to that expr)
     let q = and_of(vec![leaf(7), bool_const(true)]);
-    let cx = mcx::MemoryContext::new("prepqual-test");
+    let cx = Box::leak(Box::new(mcx::MemoryContext::new("prepqual-test")));
     let mcx = cx.mcx();
     let r = super::canonicalize_qual(mcx, Some(q), false)
         .expect("canon")
@@ -212,7 +212,7 @@ fn canonicalize_and_drops_true_const() {
 fn canonicalize_flattens_nested_and() {
     // AND(AND(x, y), z) with no consts -> single AND of [x, y, z]
     let q = and_of(vec![and_of(vec![leaf(1), leaf(2)]), leaf(3)]);
-    let cx = mcx::MemoryContext::new("prepqual-test");
+    let cx = Box::leak(Box::new(mcx::MemoryContext::new("prepqual-test")));
     let mcx = cx.mcx();
     let r = super::canonicalize_qual(mcx, Some(q), false)
         .expect("canon")

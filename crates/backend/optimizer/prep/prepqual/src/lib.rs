@@ -655,5 +655,5 @@ pub fn init_seams() {
     prepqual_seams::canonicalize_qual::set(canonicalize_qual);
 }
 
-// #[cfg(test)]
-// mod tests;
+#[cfg(test)]
+mod tests;
