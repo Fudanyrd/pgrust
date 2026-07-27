@@ -30,10 +30,6 @@ jobs:
       run: |
         export PGRUST_PGSHAREDIR="$(pwd)/vendor/postgres-18.3/share"
         cargo build --release --locked --bin postgres
-    - name: Run Unittest
-      run: |
-        export PGRUST_PGSHAREDIR="$(pwd)/vendor/postgres-18.3/share"
-        cargo test --locked --release --all || true
     - name: Run Regression
       run: |
         export PGRUST_PGSHAREDIR="$(pwd)/vendor/postgres-18.3/share"
@@ -46,3 +42,15 @@ jobs:
     #   with:
     #     name: pgrust-binary
     #     path: target/release/postgres
+    #
+    # Given that a lot of unit test crates failed to compile,
+    # we separate test crate compilation and execution.
+    # The CI log can help us verify issues.
+    - name: Compile Unittest
+      run: |
+        export PGRUST_PGSHAREDIR="$(pwd)/vendor/postgres-18.3/share"
+        cargo test --locked --release --no-run
+    - name: Run Unittest
+      run: |
+        export PGRUST_PGSHAREDIR="$(pwd)/vendor/postgres-18.3/share"
+        cargo test --locked --release --no-fail-fast
