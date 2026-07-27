@@ -282,5 +282,5 @@ pub fn init_seams() {
     seam::bloom_prop_bits_set::set(bloom_prop_bits_set);
 }
 
-// #[cfg(test)]
-// mod tests;
+#[cfg(test)]
+mod tests;

@@ -8,6 +8,7 @@ use super::*;
 use alloc::format;
 use alloc::vec::Vec;
 use std::sync::Once;
+use ::hashfn::init_seams;
 
 /// Install the real `hash_bytes_extended` (the in-repo `common-hashfn` owner),
 /// so the golden false-positive-rate test exercises the genuine Bob Jenkins
@@ -15,7 +16,7 @@ use std::sync::Once;
 fn install_hash() {
     static ONCE: Once = Once::new();
     ONCE.call_once(|| {
-        hashfn::init_seams();
+        init_seams();
     });
 }
 
