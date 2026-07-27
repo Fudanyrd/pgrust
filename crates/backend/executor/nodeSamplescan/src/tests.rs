@@ -14,6 +14,8 @@ use std::sync::{Mutex, MutexGuard};
 
 use ::mcx::{vec_with_capacity_in, MemoryContext};
 use ::nodes::executor::TupleTableSlot;
+use ::nodes::nodeindexscan::Plan;
+use ::nodes::noderesult::{Result as ResultPlan};
 use ::samplescan::TsmRoutine;
 
 thread_local! {
@@ -62,6 +64,27 @@ fn zeroed_tsm_routine() -> TsmRoutine {
     }
 }
 
+fn empty_plan<'mcx>() -> Plan<'mcx> {
+    Plan {
+        disabled_nodes: 0,
+        startup_cost: 0.00,
+        total_cost: 0.01,
+        targetlist: None,
+        qual: None,
+        plan_rows: 1.0,
+        parallel_aware: false,
+        parallel_safe: false,
+        async_capable: false,
+        plan_node_id: 0,
+        plan_width: 4,
+        lefttree: None,
+        righttree: None,
+        extParam: None,
+        allParam: None,
+        initPlan: None,
+    }
+}
+
 fn install() {
     if INSTALLED.swap(true, Ordering::SeqCst) {
         return;
@@ -70,9 +93,9 @@ fn install() {
     use tsm::*;
 
     check_for_interrupts::set(|| Ok(()));
-    es_epq_active_present::set(|_| Ok(false));
-    reset_per_tuple_expr_context::set(|_| Ok(()));
-    set_econtext_scantuple_to_scan_slot::set(|_| Ok(()));
+    es_epq_active_present::set(|_, _| Ok(false));
+    reset_per_tuple_expr_context::set(|_, _| Ok(()));
+    set_econtext_scantuple_to_scan_slot::set(|_, _| Ok(()));
     exec_clear_scan_tuple::set(|node, estate| {
         if let Some(id) = node.ss.ss_ScanTupleSlot {
             estate.slot_mut(id).tts_flags |= TTS_FLAG_EMPTY;
@@ -92,10 +115,10 @@ fn install() {
     exec_init_scan_tuple_slot::set(|_, _| Ok(()));
     exec_init_result_type_tl::set(|_, _| Ok(()));
     exec_assign_scan_projection_info::set(|_, _| Ok(()));
-    exec_init_qual::set(|_, _| Ok(()));
-    exec_init_expr_list::set(|_, _| Ok(()));
-    exec_init_repeatable_expr::set(|_, _| Ok(()));
-    exec_scan_rescan::set(|_| {
+    exec_init_qual::set(|_, _, _| Ok(()));
+    exec_init_expr_list::set(|_, _, _| Ok(()));
+    exec_init_repeatable_expr::set(|_, _, _| Ok(()));
+    exec_scan_rescan::set(|_, _| {
         log("exec_scan_rescan");
         Ok(())
     });
@@ -128,14 +151,14 @@ fn install() {
         Ok(())
     });
 
-    table_beginscan_sampling::set(|_node, _allow_sync| {
+    table_beginscan_sampling::set(|_node, _allow_sync, _| {
         // The real owner installs `ss_currentScanDesc` here; the test only needs
         // to observe that the begin path was taken (not the descriptor itself,
         // which requires a live relation to construct).
         log("table_beginscan_sampling");
         Ok(())
     });
-    table_rescan_set_params::set(|_, _| {
+    table_rescan_set_params::set(|_, _, _| {
         log("table_rescan_set_params");
         Ok(())
     });
@@ -143,7 +166,7 @@ fn install() {
         log("table_endscan");
         Ok(())
     });
-    table_scan_sample_next_block::set(|_| {
+    table_scan_sample_next_block::set(|_, _| {
         let v = BLOCKS.with(|q| q.borrow_mut().pop_front().unwrap_or(false));
         log("next_block");
         Ok(v)
@@ -155,13 +178,13 @@ fn install() {
     });
 
     scan_scanrelid::set(|_| Ok(1));
-    epq_param_is_member_of_ext_param::set(|_| Ok(false));
-    epq_relsubs_done::set(|_, _| Ok(false));
-    epq_set_relsubs_done::set(|_, _, _| Ok(()));
-    epq_relsubs_slot_present::set(|_, _| Ok(false));
-    epq_load_relsubs_slot::set(|_, _| Ok(()));
-    epq_relsubs_rowmark_present::set(|_, _| Ok(false));
-    eval_plan_qual_fetch_row_mark::set(|_, _| Ok(false));
+    epq_param_is_member_of_ext_param::set(|_, _| Ok(false));
+    epq_relsubs_done::set(|_, _, _| Ok(false));
+    epq_set_relsubs_done::set(|_, _, _, _| Ok(()));
+    epq_relsubs_slot_present::set(|_, _, _| Ok(false));
+    epq_load_relsubs_slot::set(|_, _, _| Ok(()));
+    epq_relsubs_rowmark_present::set(|_, _, _| Ok(false));
+    eval_plan_qual_fetch_row_mark::set(|_, _, _| Ok(false));
 }
 
 fn setup() -> MutexGuard<'static, ()> {
@@ -385,10 +408,20 @@ fn exec_sample_scan_returns_tuple() {
 fn init_wires_state_no_repeatable_random_seed() {
     let _g = setup();
     PRNG_SEED.with(|s| *s.borrow_mut() = 0xDEAD_BEEF);
-    let ctx = MemoryContext::new("t");
+    let ctx = Box::leak(Box::new(MemoryContext::new("t")));
     let mut estate = EStateData::new_in(ctx.mcx());
     let plan = make_sample_scan(false);
-    let out = ExecInitSampleScan(&plan, &mut estate, 0).unwrap();
+
+    let node = ::nodes::nodes::Node::mk_result(
+            ctx.mcx(),
+            ResultPlan {
+                plan: empty_plan(),
+                resconstantqual: None,
+            },
+        )
+        .unwrap();
+    let node: &'static ::nodes::nodes::Node = Box::leak(Box::new(node));
+    let out = ExecInitSampleScan(&plan, node, &mut estate, 0).unwrap();
     assert!(!out.begun);
     assert!(out.tsm_state.is_none());
     assert!(out.tsmroutine.is_some());
@@ -400,10 +433,20 @@ fn init_wires_state_no_repeatable_random_seed() {
 fn init_with_repeatable_skips_random_seed() {
     let _g = setup();
     PRNG_SEED.with(|s| *s.borrow_mut() = 0xDEAD_BEEF);
-    let ctx = MemoryContext::new("t");
+    let ctx = Box::leak(Box::new(MemoryContext::new("t")));
     let mut estate = EStateData::new_in(ctx.mcx());
     let plan = make_sample_scan(true);
-    let out = ExecInitSampleScan(&plan, &mut estate, 0).unwrap();
+
+    let node = ::nodes::nodes::Node::mk_result(
+            ctx.mcx(),
+            ResultPlan {
+                plan: empty_plan(),
+                resconstantqual: None,
+            },
+        )
+        .unwrap();
+    let node: &'static ::nodes::nodes::Node = Box::leak(Box::new(node));
+    let out = ExecInitSampleScan(&plan, node, &mut estate, 0).unwrap();
     // REPEATABLE present -> no random seed picked at init time.
     assert_eq!(out.seed, 0);
 }
