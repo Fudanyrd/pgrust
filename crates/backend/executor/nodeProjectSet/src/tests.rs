@@ -326,9 +326,10 @@ fn expr_returns_set_matches_c_discriminant() {
 fn init_classifies_elems_and_builds_workspace() {
     install_mocks();
     reset_state();
-    let ctx = MemoryContext::new("per-query");
+    let ctx = Box::leak(Box::new(MemoryContext::new("per-query")));
     let mcx = ctx.mcx();
     let node = make_projectset_plan(mcx, &[srf_funcexpr(), plain_const()]).unwrap();
+    let node: &'static Node = Box::leak(Box::new(node));
     let mut estate = EStateData::new_in(mcx);
 
     let state = init_state(mcx, &mut estate, &node).unwrap();
@@ -349,9 +350,10 @@ fn init_classifies_elems_and_builds_workspace() {
 fn project_srf_single_srf_with_result() {
     install_mocks();
     reset_state();
-    let ctx = MemoryContext::new("per-query");
+    let ctx = Box::leak(Box::new(MemoryContext::new("per-query")));
     let mcx = ctx.mcx();
     let node = make_projectset_plan(mcx, &[srf_funcexpr()]).unwrap();
+    let node: &'static Node = Box::leak(Box::new(node));
     let mut estate = EStateData::new_in(mcx);
     let mut state = init_state(mcx, &mut estate, &node).unwrap();
 
@@ -378,9 +380,10 @@ fn project_srf_single_srf_with_result() {
 fn project_srf_empty_set_returns_none() {
     install_mocks();
     reset_state();
-    let ctx = MemoryContext::new("per-query");
-    let mcx = ctx.mcx();
+    let ctx = Box::leak(Box::new(MemoryContext::new("per-query")));
+    let mcx: Mcx<'static> = ctx.mcx();
     let node = make_projectset_plan(mcx, &[srf_funcexpr()]).unwrap();
+    let node: &'static Node = Box::leak(Box::new(node));
     let mut estate = EStateData::new_in(mcx);
     let mut state = init_state(mcx, &mut estate, &node).unwrap();
 
@@ -402,9 +405,10 @@ fn project_srf_empty_set_returns_none() {
 fn project_srf_continuing_exhausted_emits_null() {
     install_mocks();
     reset_state();
-    let ctx = MemoryContext::new("per-query");
-    let mcx = ctx.mcx();
+    let ctx = Box::leak(Box::new(MemoryContext::new("per-query")));
+    let mcx: Mcx<'static> = ctx.mcx();
     let node = make_projectset_plan(mcx, &[srf_funcexpr(), srf_funcexpr()]).unwrap();
+    let node: &'static Node = Box::leak(Box::new(node));
     let mut estate = EStateData::new_in(mcx);
     let mut state = init_state(mcx, &mut estate, &node).unwrap();
 
@@ -436,9 +440,10 @@ fn project_srf_continuing_exhausted_emits_null() {
 fn project_srf_plain_plus_exhausted_no_row() {
     install_mocks();
     reset_state();
-    let ctx = MemoryContext::new("per-query");
-    let mcx = ctx.mcx();
+    let ctx = Box::leak(Box::new(MemoryContext::new("per-query")));
+    let mcx: Mcx<'static> = ctx.mcx();
     let node = make_projectset_plan(mcx, &[plain_const(), srf_funcexpr()]).unwrap();
+    let node: &'static Node = Box::leak(Box::new(node));
     let mut estate = EStateData::new_in(mcx);
     let mut state = init_state(mcx, &mut estate, &node).unwrap();
 
@@ -460,9 +465,10 @@ fn project_srf_plain_plus_exhausted_no_row() {
 fn exec_project_set_pending_continuation_returns_row() {
     install_mocks();
     reset_state();
-    let ctx = MemoryContext::new("per-query");
+    let ctx = Box::leak(Box::new(MemoryContext::new("per-query")));
     let mcx = ctx.mcx();
     let node = make_projectset_plan(mcx, &[srf_funcexpr()]).unwrap();
+    let node: &'static Node = Box::leak(Box::new(node));
     let mut estate = EStateData::new_in(mcx);
     let mut state = init_state(mcx, &mut estate, &node).unwrap();
     state.pending_srf_tuples = true;
@@ -482,9 +488,10 @@ fn exec_project_set_pending_continuation_returns_row() {
 fn exec_project_set_outer_eof_returns_none() {
     install_mocks();
     reset_state();
-    let ctx = MemoryContext::new("per-query");
+    let ctx = Box::leak(Box::new(MemoryContext::new("per-query")));
     let mcx = ctx.mcx();
     let node = make_projectset_plan(mcx, &[srf_funcexpr()]).unwrap();
+    let node: &'static Node = Box::leak(Box::new(node));
     let mut estate = EStateData::new_in(mcx);
     let mut state = init_state(mcx, &mut estate, &node).unwrap();
     attach_leaf_child(&mut state, mcx);
@@ -500,9 +507,10 @@ fn exec_project_set_outer_eof_returns_none() {
 fn rescan_clears_pending_and_rescans_child() {
     install_mocks();
     reset_state();
-    let ctx = MemoryContext::new("per-query");
+    let ctx = Box::leak(Box::new(MemoryContext::new("per-query")));
     let mcx = ctx.mcx();
     let node = make_projectset_plan(mcx, &[srf_funcexpr()]).unwrap();
+    let node: &'static Node = Box::leak(Box::new(node));
     let mut estate = EStateData::new_in(mcx);
     let mut state = init_state(mcx, &mut estate, &node).unwrap();
     attach_leaf_child(&mut state, mcx);

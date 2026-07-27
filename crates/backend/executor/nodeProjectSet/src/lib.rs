@@ -523,5 +523,5 @@ fn expr_returns_set(expr: &Expr) -> bool {
     }
 }
 
-// #[cfg(test)]
-// mod tests;
+#[cfg(test)]
+mod tests;
