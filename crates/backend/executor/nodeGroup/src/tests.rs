@@ -318,7 +318,7 @@ fn make_group_plan<'mcx>(mcx: Mcx<'mcx>, with_having: bool) -> PgResult<Node<'mc
         ));
         g.plan.qual = Some(list);
     }
-    Ok(Node::mk_group(mcx, g))
+    Ok(Node::mk_group(mcx, g).unwrap())
 }
 
 // --- tests ----------------------------------------------------------------
@@ -327,11 +327,11 @@ fn make_group_plan<'mcx>(mcx: Mcx<'mcx>, with_having: bool) -> PgResult<Node<'mc
 fn group_done_short_circuits() {
     install_mocks();
     reset_queues();
-    let cx = MemoryContext::new("per-query");
-    let mcx = cx.mcx();
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("per-query"))).mcx();
     let plan = make_group_plan(mcx, false).unwrap();
+    let node: &'static Node = Box::leak(Box::new(plan));
     let mut estate = EStateData::new_in(mcx);
-    let mut st = ExecInitGroup(&plan, &mut estate, 0).unwrap();
+    let mut st = ExecInitGroup(node, &mut estate, 0).unwrap();
     st.grp_done = true;
     let out = ExecGroup(&mut st, &mut estate).unwrap();
     assert!(out.is_none());
@@ -342,11 +342,10 @@ fn empty_input_returns_none_and_sets_grp_done() {
     install_mocks();
     reset_queues();
     OUTER.with(|c| c.borrow_mut().push_back(false)); // child EOF
-    let cx = MemoryContext::new("per-query");
-    let mcx = cx.mcx();
-    let plan = make_group_plan(mcx, false).unwrap();
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("per-query"))).mcx();
+    let node: &'static Node = Box::leak(Box::new(make_group_plan(mcx, false).unwrap()));
     let mut estate = EStateData::new_in(mcx);
-    let mut st = ExecInitGroup(&plan, &mut estate, 0).unwrap();
+    let mut st = ExecInitGroup(node, &mut estate, 0).unwrap();
     let out = ExecGroup(&mut st, &mut estate).unwrap();
     assert!(out.is_none());
     assert!(st.grp_done);
@@ -358,11 +357,10 @@ fn first_group_passes_having_projects() {
     reset_queues();
     OUTER.with(|c| c.borrow_mut().push_back(true)); // one tuple
     QUAL.with(|c| c.borrow_mut().push_back(true)); // HAVING passes
-    let cx = MemoryContext::new("per-query");
-    let mcx = cx.mcx();
-    let plan = make_group_plan(mcx, true).unwrap();
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("per-query"))).mcx();
+    let node: &'static Node = Box::leak(Box::new(make_group_plan(mcx, true).unwrap()));
     let mut estate = EStateData::new_in(mcx);
-    let mut st = ExecInitGroup(&plan, &mut estate, 0).unwrap();
+    let mut st = ExecInitGroup(node, &mut estate, 0).unwrap();
     let out = ExecGroup(&mut st, &mut estate).unwrap();
     assert!(out.is_some());
     assert!(!st.grp_done);
@@ -378,11 +376,10 @@ fn first_group_fails_having_then_scans_to_next_group() {
     OUTER.with(|c| c.borrow_mut().extend([true, true, true]));
     QUAL.with(|c| c.borrow_mut().extend([false, true]));
     EQRESET.with(|c| c.borrow_mut().extend([true, false]));
-    let cx = MemoryContext::new("per-query");
-    let mcx = cx.mcx();
-    let plan = make_group_plan(mcx, true).unwrap();
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("per-query"))).mcx();
+    let node: &'static Node = Box::leak(Box::new(make_group_plan(mcx, true).unwrap()));
     let mut estate = EStateData::new_in(mcx);
-    let mut st = ExecInitGroup(&plan, &mut estate, 0).unwrap();
+    let mut st = ExecInitGroup(node, &mut estate, 0).unwrap();
     let out = ExecGroup(&mut st, &mut estate).unwrap();
     assert!(out.is_some());
     assert!(!st.grp_done);
@@ -392,11 +389,10 @@ fn first_group_fails_having_then_scans_to_next_group() {
 fn second_group_reached_after_returning_first() {
     install_mocks();
     reset_queues();
-    let cx = MemoryContext::new("per-query");
-    let mcx = cx.mcx();
-    let plan = make_group_plan(mcx, true).unwrap();
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("per-query"))).mcx();
+    let node: &'static Node = Box::leak(Box::new(make_group_plan(mcx, true).unwrap()));
     let mut estate = EStateData::new_in(mcx);
-    let mut st = ExecInitGroup(&plan, &mut estate, 0).unwrap();
+    let mut st = ExecInitGroup(node, &mut estate, 0).unwrap();
     // First call: one tuple, HAVING passes -> first group returned, firsttuple
     // slot now non-empty.
     OUTER.with(|c| c.borrow_mut().push_back(true));
@@ -416,11 +412,10 @@ fn second_group_reached_after_returning_first() {
 fn end_group_ends_outer() {
     install_mocks();
     reset_queues();
-    let cx = MemoryContext::new("per-query");
-    let mcx = cx.mcx();
-    let plan = make_group_plan(mcx, false).unwrap();
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("per-query"))).mcx();
+    let node: &'static Node = Box::leak(Box::new(make_group_plan(mcx, false).unwrap()));
     let mut estate = EStateData::new_in(mcx);
-    let mut st = ExecInitGroup(&plan, &mut estate, 0).unwrap();
+    let mut st = ExecInitGroup(node, &mut estate, 0).unwrap();
     ExecEndGroup(&mut st, &mut estate).unwrap();
     assert_eq!(CHILD_ENDS.with(|c| c.get()), 1);
 }
@@ -429,11 +424,10 @@ fn end_group_ends_outer() {
 fn rescan_resets_and_rescans_outer_when_unchanged() {
     install_mocks();
     reset_queues();
-    let cx = MemoryContext::new("per-query");
-    let mcx = cx.mcx();
-    let plan = make_group_plan(mcx, false).unwrap();
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("per-query"))).mcx();
+    let node: &'static Node = Box::leak(Box::new(make_group_plan(mcx, false).unwrap()));
     let mut estate = EStateData::new_in(mcx);
-    let mut st = ExecInitGroup(&plan, &mut estate, 0).unwrap();
+    let mut st = ExecInitGroup(node, &mut estate, 0).unwrap();
     st.grp_done = true;
     // child chgParam is None (default) => ExecReScan called.
     ExecReScanGroup(&mut st, &mut estate).unwrap();
@@ -448,11 +442,10 @@ fn rescan_resets_and_rescans_outer_when_unchanged() {
 fn rescan_skips_outer_rescan_when_child_has_chgparam() {
     install_mocks();
     reset_queues();
-    let cx = MemoryContext::new("per-query");
-    let mcx = cx.mcx();
-    let plan = make_group_plan(mcx, false).unwrap();
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("per-query"))).mcx();
+    let node: &'static Node = Box::leak(Box::new(make_group_plan(mcx, false).unwrap()));
     let mut estate = EStateData::new_in(mcx);
-    let mut st = ExecInitGroup(&plan, &mut estate, 0).unwrap();
+    let mut st = ExecInitGroup(node, &mut estate, 0).unwrap();
     // Give the child a non-empty chgParam so ExecReScan is NOT called.
     {
         let outer = st.ss.ps.lefttree.as_deref_mut().unwrap();

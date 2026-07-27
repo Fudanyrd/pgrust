@@ -422,5 +422,5 @@ pub fn ExecReScanGroup<'mcx>(
     Ok(())
 }
 
-// #[cfg(test)]
-// mod tests;
+#[cfg(test)]
+mod tests;
