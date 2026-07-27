@@ -7,6 +7,7 @@
 use std::cell::Cell;
 use std::mem::size_of;
 use std::sync::Once;
+use std::ops::DerefMut;
 
 use ::mcx::{Mcx, MemoryContext, PgBox, PgVec};
 use ::nodes::execnodes::{BackwardScanDirection, PlanStateData, ScanStateData};
@@ -184,11 +185,11 @@ fn mock_exec_init_node<'mcx>(
 ) -> PgResult<Option<PgBox<'mcx, PlanStateNode<'mcx>>>> {
     match node {
         None => Ok(None),
-        Some(node @ Node::Material(_)) => {
+        Some(node) => {
+            let _ =  node.expect_material();
             let state = ExecInitMaterial(node, estate, eflags)?;
             Ok(Some(alloc_in(mcx, PlanStateNode::Material(state))?))
         }
-        Some(_) => unreachable!("only Material nodes exist"),
     }
 }
 
@@ -303,8 +304,9 @@ fn init_with_leaf_child<'mcx>(
 #[test]
 fn init_material_accounting_is_exact() {
     install_mocks();
-    let ctx = MemoryContext::new("per-query");
-    let plan = Node::mk_material(ctx.mcx(), Material::default());
+    let ctx = Box::leak(Box::new(MemoryContext::new("per-query")));
+    let plan = Node::mk_material(ctx.mcx(), Material::default()).unwrap();
+    let plan: &'static Node = Box::leak(Box::new(plan));
     let mut estate = EStateData::new_in(ctx.mcx());
 
     let matstate = ExecInitMaterial(&plan, &mut estate, EXEC_FLAG_REWIND).unwrap();
@@ -327,8 +329,9 @@ fn init_material_accounting_is_exact() {
 #[test]
 fn backward_eflag_adds_rewind_and_shields_child() {
     install_mocks();
-    let ctx = MemoryContext::new("per-query");
-    let plan = Node::mk_material(ctx.mcx(), Material::default());
+    let ctx = Box::leak(Box::new(MemoryContext::new("per-query")));
+    let plan = Node::mk_material(ctx.mcx(), Material::default()).unwrap();
+    let plan: &'static Node = Box::leak(Box::new(plan));
     let mut estate = EStateData::new_in(ctx.mcx());
     let matstate = ExecInitMaterial(&plan, &mut estate, EXEC_FLAG_BACKWARD).unwrap();
     assert_eq!(matstate.eflags, EXEC_FLAG_BACKWARD | EXEC_FLAG_REWIND);
@@ -337,8 +340,9 @@ fn backward_eflag_adds_rewind_and_shields_child() {
 #[test]
 fn eflags_zero_passes_rows_through_without_tuplestore() {
     install_mocks();
-    let ctx = MemoryContext::new("per-query");
-    let plan = Node::mk_material(ctx.mcx(), Material::default());
+    let ctx = Box::leak(Box::new(MemoryContext::new("per-query")));
+    let plan = Node::mk_material(ctx.mcx(), Material::default()).unwrap();
+    let plan: &'static Node = Box::leak(Box::new(plan));
     let mut estate = EStateData::new_in(ctx.mcx());
     let mut node = init_with_leaf_child(&plan, &mut estate, 0);
     SUPPLY.with(|c| c.set(1));
@@ -360,8 +364,9 @@ fn eflags_zero_passes_rows_through_without_tuplestore() {
 #[test]
 fn rewind_materializes_then_replays_without_rereading_subplan() {
     install_mocks();
-    let ctx = MemoryContext::new("per-query");
-    let plan = Node::mk_material(ctx.mcx(), Material::default());
+    let ctx = Box::leak(Box::new(MemoryContext::new("per-query")));
+    let plan = Node::mk_material(ctx.mcx(), Material::default()).unwrap();
+    let plan:&'static Node = Box::leak(Box::new(plan));
     let mut estate = EStateData::new_in(ctx.mcx());
     let mut node = init_with_leaf_child(&plan, &mut estate, EXEC_FLAG_REWIND);
     SUPPLY.with(|c| c.set(2));
@@ -381,7 +386,7 @@ fn rewind_materializes_then_replays_without_rereading_subplan() {
     // Rescan with no chgParam and REWIND supported: rewind the stored output;
     // the subplan is NOT re-read (supply stays 0) and not rescanned.
     let child_rescans = CHILD_RESCANS.with(|c| c.get());
-    ExecReScanMaterial(&mut node, &mut estate).unwrap();
+    ExecReScanMaterial(node.deref_mut(), &mut estate).unwrap();
     assert_eq!(CHILD_RESCANS.with(|c| c.get()), child_rescans);
     assert!(ExecMaterial(&mut node, &mut estate).unwrap());
     assert!(ExecMaterial(&mut node, &mut estate).unwrap());
@@ -392,9 +397,10 @@ fn rewind_materializes_then_replays_without_rereading_subplan() {
 #[test]
 fn backward_scan_reads_back_from_store() {
     install_mocks();
-    let ctx = MemoryContext::new("per-query");
-    let plan = Node::mk_material(ctx.mcx(), Material::default());
-    let mut estate = EStateData::new_in(ctx.mcx());
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("t"))).mcx();
+    let plan = Node::mk_material(mcx, Material::default()).unwrap();
+    let plan: &'static Node = Box::leak(Box::new(plan));
+    let mut estate = EStateData::new_in(mcx);
     let mut node = init_with_leaf_child(&plan, &mut estate, EXEC_FLAG_REWIND | EXEC_FLAG_BACKWARD);
     SUPPLY.with(|c| c.set(2));
 
@@ -411,9 +417,10 @@ fn backward_scan_reads_back_from_store() {
 #[test]
 fn mark_and_restore_copy_read_pointers() {
     install_mocks();
-    let ctx = MemoryContext::new("per-query");
-    let plan = Node::mk_material(ctx.mcx(), Material::default());
-    let mut estate = EStateData::new_in(ctx.mcx());
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("t"))).mcx();
+    let plan = Node::mk_material(mcx, Material::default()).unwrap();
+    let plan: &'static Node = Box::leak(Box::new(plan));
+    let mut estate = EStateData::new_in(mcx);
     let mut node = init_with_leaf_child(&plan, &mut estate, EXEC_FLAG_REWIND | EXEC_FLAG_MARK);
     SUPPLY.with(|c| c.set(2));
 
@@ -422,11 +429,11 @@ fn mark_and_restore_copy_read_pointers() {
         let ts = node.tuplestorestate.as_deref().unwrap();
         assert_eq!(store_ref(ts).extra_ptrs, 1, "MARK allocated read pointer 1");
     }
-    ExecMaterialMarkPos(&mut node).unwrap();
+    ExecMaterialMarkPos(node.deref_mut()).unwrap();
     assert_eq!(store_ref(node.tuplestorestate.as_deref().unwrap()).positions[1], 1);
 
     assert!(ExecMaterial(&mut node, &mut estate).unwrap());
-    ExecMaterialRestrPos(&mut node).unwrap();
+    ExecMaterialRestrPos(node.deref_mut()).unwrap();
     assert_eq!(
         store_ref(node.tuplestorestate.as_deref().unwrap()).positions[0],
         1,
@@ -437,9 +444,10 @@ fn mark_and_restore_copy_read_pointers() {
 #[test]
 fn rescan_with_changed_params_drops_store_and_rescans_child() {
     install_mocks();
-    let ctx = MemoryContext::new("per-query");
-    let plan = Node::mk_material(ctx.mcx(), Material::default());
-    let mut estate = EStateData::new_in(ctx.mcx());
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("t"))).mcx(); 
+    let plan = Node::mk_material(mcx, Material::default()).unwrap();
+    let plan: &'static Node = Box::leak(Box::new(plan));
+    let mut estate = EStateData::new_in(mcx);
     let mut node = init_with_leaf_child(&plan, &mut estate, EXEC_FLAG_REWIND);
     SUPPLY.with(|c| c.set(1));
 
@@ -449,6 +457,7 @@ fn rescan_with_changed_params_drops_store_and_rescans_child() {
 
     // chgParam != NULL: forget the stored results; the child is re-scanned by
     // its next ExecProcNode, not here.
+    let _ctx = MemoryContext::new("per-query");
     let mcx = estate.es_query_cxt;
     node.ss
         .ps
@@ -466,7 +475,7 @@ fn rescan_with_changed_params_drops_store_and_rescans_child() {
         .unwrap(),
     );
     let child_rescans = CHILD_RESCANS.with(|c| c.get());
-    ExecReScanMaterial(&mut node, &mut estate).unwrap();
+    ExecReScanMaterial(node.deref_mut(), &mut estate).unwrap();
     assert!(node.tuplestorestate.is_none(), "store was ended");
     assert!(!node.eof_underlying);
     assert_eq!(
@@ -479,18 +488,20 @@ fn rescan_with_changed_params_drops_store_and_rescans_child() {
 #[test]
 fn all_bytes_return_on_drop() {
     install_mocks();
-    let ctx = MemoryContext::new("per-query");
+    let ctx = Box::leak(Box::new(MemoryContext::new("t")));
+    let mcx: Mcx<'static> = ctx.mcx();
     let live_before = LIVE_STORES.with(|c| c.get());
+    let plan = Node::mk_material(mcx, Material::default()).unwrap();
+    let plan: &'static Node = Box::leak(Box::new(plan));
     {
-        let plan = Node::mk_material(ctx.mcx(), Material::default());
-        let mut estate = EStateData::new_in(ctx.mcx());
+        let mut estate = EStateData::new_in(mcx);
         let mut node = init_with_leaf_child(&plan, &mut estate, EXEC_FLAG_REWIND);
         SUPPLY.with(|c| c.set(2));
         assert!(ExecMaterial(&mut node, &mut estate).unwrap());
         assert!(ExecMaterial(&mut node, &mut estate).unwrap());
         assert!(ctx.used() > 0);
 
-        ExecEndMaterial(&mut node, &mut estate).unwrap();
+        ExecEndMaterial(node.deref_mut(), &mut estate).unwrap();
         assert!(node.tuplestorestate.is_none(), "tuplestore released");
         assert_eq!(
             LIVE_STORES.with(|c| c.get()),
@@ -498,7 +509,7 @@ fn all_bytes_return_on_drop() {
             "tuplestore_end consumed the store"
         );
     }
-    assert_eq!(ctx.used(), 0, "dropping the state tree returns every byte");
+    assert_eq!(ctx.used(), 0);
 }
 
 #[test]
