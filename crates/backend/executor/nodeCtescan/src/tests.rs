@@ -312,10 +312,10 @@ fn exec_cte_scan_drives_exec_scan() {
 fn init_leader_path_creates_shared_store_and_runs_setup() {
     setup();
     IS_LEADER.with(|c| c.set(true));
-    let ctx = MemoryContext::new("per-query");
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("t"))).mcx();
     let node_plan = ::mcx::alloc_in(
-        ctx.mcx(),
-        ::nodes::nodes::Node::mk_cte_scan(ctx.mcx(), CteScan {
+        mcx,
+        ::nodes::nodes::Node::mk_cte_scan(mcx, CteScan {
             ctePlanId: 1,
             cteParam: 0,
             ..Default::default()
@@ -323,7 +323,9 @@ fn init_leader_path_creates_shared_store_and_runs_setup() {
         .unwrap(),
     )
     .unwrap();
-    let mut estate = estate(ctx.mcx());
+    let node_plan: &'static ::nodes::nodes::Node = Box::leak(Box::new(node_plan));
+
+    let mut estate = estate(mcx);
     let node = ExecInitCteScan(&node_plan, 0, &mut estate).unwrap();
     assert_eq!(node.eflags, EXEC_FLAG_REWIND);
     assert_eq!(node.readptr, 0);
@@ -343,10 +345,10 @@ fn init_leader_path_creates_shared_store_and_runs_setup() {
 fn init_follower_path_allocs_own_read_pointer() {
     setup();
     IS_LEADER.with(|c| c.set(false));
-    let ctx = MemoryContext::new("per-query");
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("t"))).mcx();
     let node_plan = ::mcx::alloc_in(
-        ctx.mcx(),
-        ::nodes::nodes::Node::mk_cte_scan(ctx.mcx(), CteScan {
+        mcx,
+        ::nodes::nodes::Node::mk_cte_scan(mcx, CteScan {
             ctePlanId: 1,
             cteParam: 0,
             ..Default::default()
@@ -354,7 +356,9 @@ fn init_follower_path_allocs_own_read_pointer() {
         .unwrap(),
     )
     .unwrap();
-    let mut estate = estate(ctx.mcx());
+    let node_plan: &'static ::nodes::nodes::Node = Box::leak(Box::new(node_plan));
+
+    let mut estate = estate(mcx);
     let _node = ExecInitCteScan(&node_plan, 0, &mut estate).unwrap();
     log_eq(&[
         "link_cte_plan_state",
