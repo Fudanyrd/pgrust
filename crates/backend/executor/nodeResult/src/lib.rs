@@ -293,5 +293,5 @@ pub fn ExecReScanResult<'mcx>(
     Ok(())
 }
 
-// #[cfg(test)]
-// mod tests;
+#[cfg(test)]
+mod tests;

@@ -135,6 +135,7 @@ fn mock_assign_expr_context<'mcx>(
         domainValue_datum: Default::default(),
         domainValue_isNull: true,
         ecxt_callbacks: None,
+        ecxt_param_list_info: None,
     };
     planstate.ps_ExprContext = Some(estate.add_expr_context(econtext)?);
     Ok(())
@@ -226,7 +227,7 @@ fn make_result_plan<'mcx>(mcx: Mcx<'mcx>, with_constqual: bool) -> PgResult<Node
         ));
         plan.resconstantqual = Some(list);
     }
-    Ok(Node::mk_result(mcx, plan))
+    Ok(Node::mk_result(mcx, plan).unwrap())
 }
 
 /// Splice a leaf child into an initialized ResultState so the
@@ -245,11 +246,12 @@ fn attach_leaf_child<'mcx>(node: &mut ResultState<'mcx>, mcx: Mcx<'mcx>) {
 fn init_sets_checkqual_from_resconstantqual_presence() {
     install_mocks();
     reset_counters();
-    let ctx = MemoryContext::new("per-query");
+    let ctx = Box::leak(Box::new(MemoryContext::new("per-query")));
 
     // resconstantqual present => rs_checkqual = true.
     let plan = make_result_plan(ctx.mcx(), true).unwrap();
     let mut estate = EStateData::new_in(ctx.mcx());
+    let plan: &'static Node = Box::leak(Box::new(plan));
     let st = ExecInitResult(&plan, &mut estate, 0).unwrap();
     assert!(!st.rs_done);
     assert!(st.rs_checkqual);
@@ -263,9 +265,10 @@ fn init_sets_checkqual_from_resconstantqual_presence() {
 fn init_without_constqual_leaves_checkqual_false() {
     install_mocks();
     reset_counters();
-    let ctx = MemoryContext::new("per-query");
+    let ctx = Box::leak(Box::new(MemoryContext::new("per-query")));
     let plan = make_result_plan(ctx.mcx(), false).unwrap();
     let mut estate = EStateData::new_in(ctx.mcx());
+    let plan: &'static Node = Box::leak(Box::new(plan));
     let st = ExecInitResult(&plan, &mut estate, 0).unwrap();
     assert!(!st.rs_checkqual);
     assert!(st.resconstantqual.is_none());
@@ -275,9 +278,10 @@ fn init_without_constqual_leaves_checkqual_false() {
 fn constant_target_list_returns_one_tuple_then_null() {
     install_mocks();
     reset_counters();
-    let ctx = MemoryContext::new("per-query");
+    let ctx = Box::leak(Box::new(MemoryContext::new("per-query")));
     let plan = make_result_plan(ctx.mcx(), false).unwrap();
     let mut estate = EStateData::new_in(ctx.mcx());
+    let plan: &'static Node = Box::leak(Box::new(plan));
     let mut st = ExecInitResult(&plan, &mut estate, 0).unwrap();
 
     // No outer plan => generate the constant target list exactly once.
@@ -295,9 +299,10 @@ fn constant_target_list_returns_one_tuple_then_null() {
 fn one_time_filter_false_returns_empty_set() {
     install_mocks();
     reset_counters();
-    let ctx = MemoryContext::new("per-query");
+    let ctx = Box::leak(Box::new(MemoryContext::new("per-query")));
     let plan = make_result_plan(ctx.mcx(), true).unwrap();
     let mut estate = EStateData::new_in(ctx.mcx());
+    let plan: &'static Node = Box::leak(Box::new(plan));
     let mut st = ExecInitResult(&plan, &mut estate, 0).unwrap();
 
     QUAL_RESULT.with(|c| c.set(false));
@@ -315,9 +320,10 @@ fn one_time_filter_false_returns_empty_set() {
 fn one_time_filter_true_then_runs_constant_projection() {
     install_mocks();
     reset_counters();
-    let ctx = MemoryContext::new("per-query");
+    let ctx = Box::leak(Box::new(MemoryContext::new("per-query")));
     let plan = make_result_plan(ctx.mcx(), true).unwrap();
     let mut estate = EStateData::new_in(ctx.mcx());
+    let plan: &'static Node = Box::leak(Box::new(plan));
     let mut st = ExecInitResult(&plan, &mut estate, 0).unwrap();
 
     QUAL_RESULT.with(|c| c.set(true));
@@ -332,9 +338,10 @@ fn one_time_filter_true_then_runs_constant_projection() {
 fn outer_plan_rows_are_projected_then_exhausted() {
     install_mocks();
     reset_counters();
-    let ctx = MemoryContext::new("per-query");
+    let ctx = Box::leak(Box::new(MemoryContext::new("per-query")));
     let mcx = ctx.mcx();
     let plan = make_result_plan(mcx, false).unwrap();
+    let plan: &'static Node = Box::leak(Box::new(plan));
     let mut estate = EStateData::new_in(mcx);
     let mut st = ExecInitResult(&plan, &mut estate, 0).unwrap();
     attach_leaf_child(&mut st, mcx);
@@ -358,9 +365,10 @@ fn outer_plan_rows_are_projected_then_exhausted() {
 fn rescan_resets_done_and_checkqual_and_rescans_child() {
     install_mocks();
     reset_counters();
-    let ctx = MemoryContext::new("per-query");
+    let ctx = Box::leak(Box::new(MemoryContext::new("per-query")));
     let mcx = ctx.mcx();
     let plan = make_result_plan(mcx, true).unwrap();
+    let plan: &'static Node = Box::leak(Box::new(plan));
     let mut estate = EStateData::new_in(mcx);
     let mut st = ExecInitResult(&plan, &mut estate, 0).unwrap();
     attach_leaf_child(&mut st, mcx);
@@ -382,8 +390,8 @@ fn rescan_resets_done_and_checkqual_and_rescans_child() {
 fn rescan_without_outer_plan_skips_child_rescan() {
     install_mocks();
     reset_counters();
-    let ctx = MemoryContext::new("per-query");
-    let plan = make_result_plan(ctx.mcx(), false).unwrap();
+    let ctx = Box::leak(Box::new(MemoryContext::new("per-query")));
+    let plan: &'static Node = Box::leak(Box::new(make_result_plan(ctx.mcx(), false).unwrap()));
     let mut estate = EStateData::new_in(ctx.mcx());
     let mut st = ExecInitResult(&plan, &mut estate, 0).unwrap();
     st.rs_done = true;
@@ -398,9 +406,10 @@ fn rescan_without_outer_plan_skips_child_rescan() {
 fn markpos_restrpos_delegate_to_child_when_present() {
     install_mocks();
     reset_counters();
-    let ctx = MemoryContext::new("per-query");
+    let ctx = Box::leak(Box::new(MemoryContext::new("per-query")));
     let mcx = ctx.mcx();
     let plan = make_result_plan(mcx, false).unwrap();
+    let plan: &'static Node = Box::leak(Box::new(plan));
     let mut estate = EStateData::new_in(mcx);
     let mut st = ExecInitResult(&plan, &mut estate, 0).unwrap();
     attach_leaf_child(&mut st, mcx);
@@ -415,8 +424,9 @@ fn markpos_restrpos_delegate_to_child_when_present() {
 fn markpos_without_child_is_debug_noop() {
     install_mocks();
     reset_counters();
-    let ctx = MemoryContext::new("per-query");
+    let ctx = Box::leak(Box::new(MemoryContext::new("per-query")));
     let plan = make_result_plan(ctx.mcx(), false).unwrap();
+    let plan: &'static Node = Box::leak(Box::new(plan));
     let mut estate = EStateData::new_in(ctx.mcx());
     let mut st = ExecInitResult(&plan, &mut estate, 0).unwrap();
 
@@ -429,8 +439,9 @@ fn markpos_without_child_is_debug_noop() {
 fn restrpos_without_child_errors() {
     install_mocks();
     reset_counters();
-    let ctx = MemoryContext::new("per-query");
+    let ctx = Box::leak(Box::new(MemoryContext::new("per-query")));
     let plan = make_result_plan(ctx.mcx(), false).unwrap();
+    let plan: &'static Node = Box::leak(Box::new(plan));
     let mut estate = EStateData::new_in(ctx.mcx());
     let mut st = ExecInitResult(&plan, &mut estate, 0).unwrap();
 
@@ -443,8 +454,9 @@ fn restrpos_without_child_errors() {
 fn end_result_is_ok() {
     install_mocks();
     reset_counters();
-    let ctx = MemoryContext::new("per-query");
+    let ctx = Box::leak(Box::new(MemoryContext::new("per-query")));
     let plan = make_result_plan(ctx.mcx(), false).unwrap();
+    let plan: &'static Node = Box::leak(Box::new(plan));
     let mut estate = EStateData::new_in(ctx.mcx());
     let mut st = ExecInitResult(&plan, &mut estate, 0).unwrap();
     ExecEndResult(&mut st, &mut estate).unwrap();
