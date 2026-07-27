@@ -128,13 +128,24 @@ fn make_es<'mcx>(
     es
 }
 
+fn make_static_es(
+    mcx: Mcx<'static>,
+    serialize: ExplainSerializeOption,
+    timing: bool,
+    buffers: bool,
+) -> &'static ExplainState<'static> {
+    let es = make_es(mcx, serialize, timing, buffers);
+    Box::leak(Box::new(es))
+}
+
 // --- tests -------------------------------------------------------------------
 
 #[test]
 fn create_records_mydest() {
-    let cx = MemoryContext::new("t");
-    let es = make_es(
-        cx.mcx(),
+    // Create a static memory context for the test.
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("t"))).mcx();
+    let es = make_static_es(
+        mcx,
         ExplainSerializeOption::EXPLAIN_SERIALIZE_TEXT,
         false,
         false,
@@ -146,28 +157,28 @@ fn create_records_mydest() {
 
 #[test]
 fn startup_selects_format_and_zeroes_metrics() {
-    let cx = MemoryContext::new("t");
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("t"))).mcx();
 
-    let es_text = make_es(
-        cx.mcx(),
+    let es_text = make_static_es(
+        mcx,
         ExplainSerializeOption::EXPLAIN_SERIALIZE_TEXT,
         false,
         false,
     );
     let mut r = CreateExplainSerializeDestReceiver(&es_text);
     r.metrics.bytesSent = 999; // dirty it
-    let _ = serializeAnalyzeStartup(&mut r, cx.mcx(), 0, &make_tupdesc(cx.mcx(), &[])).unwrap();
+    let _ = serializeAnalyzeStartup(&mut r, mcx, 0, &make_tupdesc(mcx, &[])).unwrap();
     assert_eq!(r.format, 0);
     assert_eq!(r.metrics, SerializeMetrics::default());
 
-    let es_bin = make_es(
-        cx.mcx(),
+    let es_bin = make_static_es(
+        mcx,
         ExplainSerializeOption::EXPLAIN_SERIALIZE_BINARY,
         false,
         false,
     );
     let mut r2 = CreateExplainSerializeDestReceiver(&es_bin);
-    let _ = serializeAnalyzeStartup(&mut r2, cx.mcx(), 0, &make_tupdesc(cx.mcx(), &[])).unwrap();
+    let _ = serializeAnalyzeStartup(&mut r2, mcx, 0, &make_tupdesc(mcx, &[])).unwrap();
     assert_eq!(r2.format, 1);
 
     // Shutdown clears finfos / attrinfo / nattrs.
@@ -186,22 +197,22 @@ fn binary_path_lengths_and_byte_count() {
         binary_out: vec![0xde, 0xad, 0xbe, 0xef],
     });
 
-    let cx = MemoryContext::new("t");
-    let es = make_es(
-        cx.mcx(),
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("t"))).mcx();
+    let es = make_static_es(
+        mcx,
         ExplainSerializeOption::EXPLAIN_SERIALIZE_BINARY,
         false,
         false,
     );
     let mut receiver = CreateExplainSerializeDestReceiver(&es);
 
-    let typeinfo = make_tupdesc(cx.mcx(), &[17]);
-    let mut buf = serializeAnalyzeStartup(&mut receiver, cx.mcx(), 0, &typeinfo).unwrap();
+    let typeinfo = make_tupdesc(mcx, &[17]);
+    let mut buf = serializeAnalyzeStartup(&mut receiver, mcx, 0, &typeinfo).unwrap();
     assert_eq!(receiver.format, 1);
 
-    let mut slot = make_slot(cx.mcx());
+    let mut slot = make_slot(mcx);
     let ok =
-        serializeAnalyzeReceive(&mut receiver, cx.mcx(), &mut buf, &typeinfo, &mut slot).unwrap();
+        serializeAnalyzeReceive(&mut receiver, mcx, &mut buf, &typeinfo, &mut slot).unwrap();
     assert!(ok);
 
     // Binary DataRow body: int16 natts, int32 payload length, payload bytes.
@@ -221,20 +232,20 @@ fn null_column_emits_minus_one_and_accumulates() {
         binary_out: vec![0xaa],
     });
 
-    let cx = MemoryContext::new("t");
-    let es = make_es(
-        cx.mcx(),
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("t"))).mcx();
+    let es = make_static_es(
+        mcx,
         ExplainSerializeOption::EXPLAIN_SERIALIZE_BINARY,
         false,
         false,
     );
     let mut receiver = CreateExplainSerializeDestReceiver(&es);
 
-    let typeinfo = make_tupdesc(cx.mcx(), &[17, 25]);
-    let mut buf = serializeAnalyzeStartup(&mut receiver, cx.mcx(), 0, &typeinfo).unwrap();
+    let typeinfo = make_tupdesc(mcx, &[17, 25]);
+    let mut buf = serializeAnalyzeStartup(&mut receiver, mcx, 0, &typeinfo).unwrap();
 
-    let mut slot = make_slot(cx.mcx());
-    serializeAnalyzeReceive(&mut receiver, cx.mcx(), &mut buf, &typeinfo, &mut slot).unwrap();
+    let mut slot = make_slot(mcx);
+    serializeAnalyzeReceive(&mut receiver, mcx, &mut buf, &typeinfo, &mut slot).unwrap();
 
     let mut expected: Vec<u8> = Vec::new();
     expected.extend_from_slice(&2u16.to_be_bytes()); // natts
@@ -245,7 +256,7 @@ fn null_column_emits_minus_one_and_accumulates() {
     assert_eq!(receiver.metrics.bytesSent, expected.len() as u64);
 
     // A second row accumulates onto bytesSent.
-    serializeAnalyzeReceive(&mut receiver, cx.mcx(), &mut buf, &typeinfo, &mut slot).unwrap();
+    serializeAnalyzeReceive(&mut receiver, mcx, &mut buf, &typeinfo, &mut slot).unwrap();
     assert_eq!(receiver.metrics.bytesSent, (expected.len() * 2) as u64);
 }
 
@@ -257,23 +268,23 @@ fn timing_and_buffers_paths_run() {
         binary_out: vec![0x07],
     });
 
-    let cx = MemoryContext::new("t");
-    let es = make_es(
-        cx.mcx(),
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("t"))).mcx();
+    let es = make_static_es(
+        mcx,
         ExplainSerializeOption::EXPLAIN_SERIALIZE_BINARY,
         true,
         true,
     );
     let mut receiver = CreateExplainSerializeDestReceiver(&es);
 
-    let typeinfo = make_tupdesc(cx.mcx(), &[17]);
-    let mut buf = serializeAnalyzeStartup(&mut receiver, cx.mcx(), 0, &typeinfo).unwrap();
+    let typeinfo = make_tupdesc(mcx, &[17]);
+    let mut buf = serializeAnalyzeStartup(&mut receiver, mcx, 0, &typeinfo).unwrap();
 
-    let mut slot = make_slot(cx.mcx());
+    let mut slot = make_slot(mcx);
     // With timing+buffers on, the measurement code reads the real clock and
     // pgBufferUsage twice each; the path must run and the accumulations stay
     // non-negative (a monotonic clock can give a 0-tick delta on a fast machine).
-    serializeAnalyzeReceive(&mut receiver, cx.mcx(), &mut buf, &typeinfo, &mut slot).unwrap();
+    serializeAnalyzeReceive(&mut receiver, mcx, &mut buf, &typeinfo, &mut slot).unwrap();
     assert!(receiver.metrics.timeSpent.ticks >= 0);
     // Binary body: int16 natts (2) + int32 len (4) + 1 payload byte = 7.
     assert_eq!(receiver.metrics.bytesSent, 7);
@@ -283,9 +294,9 @@ fn timing_and_buffers_paths_run() {
 fn unsupported_format_errors() {
     // The format-7 branch errors before touching any seam (the loop's
     // format dispatch hits its `else` arm first).
-    let cx = MemoryContext::new("t");
-    let es = make_es(
-        cx.mcx(),
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("t"))).mcx();
+    let es = make_static_es(
+        mcx,
         ExplainSerializeOption::EXPLAIN_SERIALIZE_TEXT,
         false,
         false,
@@ -293,18 +304,18 @@ fn unsupported_format_errors() {
     let mut receiver = CreateExplainSerializeDestReceiver(&es);
     receiver.format = 7; // C `else` branch
 
-    let typeinfo = make_tupdesc(cx.mcx(), &[23]);
+    let typeinfo = make_tupdesc(mcx, &[23]);
     let err = serialize_prepare_info(&mut receiver, &typeinfo, 1).unwrap_err();
     assert!(err.message().contains("unsupported format code: 7"));
 }
 
 #[test]
 fn get_serialization_metrics_handles_other_receiver() {
-    let cx = MemoryContext::new("t");
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("t"))).mcx();
     assert_eq!(GetSerializationMetrics(None), SerializeMetrics::default());
 
-    let es = make_es(
-        cx.mcx(),
+    let es = make_static_es(
+        mcx,
         ExplainSerializeOption::EXPLAIN_SERIALIZE_TEXT,
         false,
         false,
