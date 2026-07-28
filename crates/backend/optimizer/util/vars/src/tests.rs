@@ -1,6 +1,7 @@
 //! Unit tests for the var.c read-only walkers (no cross-crate seam needed).
 
 use crate::var::*;
+use mcx::{Mcx, MemoryContext};
 use ::nodes::nodes::Node;
 use ::nodes::primnodes::{Expr, OpExpr, Var};
 
@@ -12,7 +13,7 @@ fn var_at(varno: i32, levelsup: u32) -> Var {
     }
 }
 
-fn op_of(args: Vec<Expr>) -> Expr {
+fn op_of<'a>(args: Vec<Expr<'a>>) -> Expr<'a> {
     Expr::OpExpr(OpExpr {
         args,
         ..OpExpr::default()
@@ -21,12 +22,14 @@ fn op_of(args: Vec<Expr>) -> Expr {
 
 #[test]
 fn pull_varnos_collects_distinct_level0_varnos() {
-    let node = Node::Expr(op_of(vec![
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("t"))).mcx();
+    let node = Node::mk_expr(mcx, op_of(vec![
         Expr::Var(var_at(2, 0)),
         Expr::Var(var_at(5, 0)),
         Expr::Var(var_at(2, 0)),
         Expr::Var(var_at(9, 1)), // upper level — ignored
-    ]));
+    ]))
+    .unwrap();
     let relids = pull_varnos(None, &node);
     let bms = relids.expect("non-empty");
     // members 2 and 5 set: bit2|bit5 = 0b100100 = 36
@@ -35,10 +38,12 @@ fn pull_varnos_collects_distinct_level0_varnos() {
 
 #[test]
 fn pull_varnos_of_level_filters_by_level() {
-    let node = Node::Expr(op_of(vec![
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("t"))).mcx();
+    let node = Node::mk_expr(mcx, op_of(vec![
         Expr::Var(var_at(2, 0)),
         Expr::Var(var_at(7, 1)),
-    ]));
+    ]))
+    .unwrap();
     let r0 = pull_varnos_of_level(None, &node, 0).expect("lvl0");
     assert_eq!(r0.words[0], 1u64 << 2);
     let r1 = pull_varnos_of_level(None, &node, 1).expect("lvl1");
@@ -47,27 +52,30 @@ fn pull_varnos_of_level_filters_by_level() {
 
 #[test]
 fn contain_var_clause_detects_level0_var() {
-    let with = Node::Expr(Expr::Var(var_at(1, 0)));
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("t"))).mcx();
+    let with = Node::mk_expr(mcx, Expr::Var(var_at(1, 0))).unwrap();
     assert!(contain_var_clause(&with));
-    let upper = Node::Expr(Expr::Var(var_at(1, 2)));
+    let upper = Node::mk_expr(mcx, Expr::Var(var_at(1, 2))).unwrap();
     assert!(!contain_var_clause(&upper));
-    let constish = Node::Expr(Expr::Const(::nodes::primnodes::Const::default()));
+    let constish = Node::mk_expr(mcx, Expr::Const(::nodes::primnodes::Const::default())).unwrap();
     assert!(!contain_var_clause(&constish));
 }
 
 #[test]
 fn contain_vars_of_level_matches_specific_level() {
-    let node = Node::Expr(op_of(vec![Expr::Var(var_at(1, 1))]));
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("t"))).mcx();
+    let node = Node::mk_expr(mcx, op_of(vec![Expr::Var(var_at(1, 1))])).unwrap();
     assert!(!contain_vars_of_level(&node, 0));
     assert!(contain_vars_of_level(&node, 1));
 }
 
 #[test]
 fn pull_vars_of_level_clones_matching_vars() {
-    let node = Node::Expr(op_of(vec![
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("t"))).mcx();
+    let node = Node::mk_expr(mcx, op_of(vec![
         Expr::Var(var_at(3, 0)),
         Expr::Var(var_at(4, 1)),
-    ]));
+    ])).unwrap();
     let scratch = mcx::MemoryContext::new("pull_vars_of_level test");
     let vars = pull_vars_of_level(scratch.mcx(), &node, 0).expect("ok");
     assert_eq!(vars.len(), 1);
@@ -81,7 +89,8 @@ fn pull_vars_of_level_clones_matching_vars() {
 fn locate_var_of_level_reports_location() {
     let mut v = var_at(1, 0);
     v.location = 42;
-    let node = Node::Expr(op_of(vec![Expr::Var(v)]));
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("t"))).mcx();
+    let node = Node::mk_expr(mcx, op_of(vec![Expr::Var(v)])).unwrap();
     assert_eq!(locate_var_of_level(&node, 0), 42);
     // no level-1 var → -1
     assert_eq!(locate_var_of_level(&node, 1), -1);
@@ -92,17 +101,19 @@ fn pull_varattnos_offsets_by_first_low_invalid() {
     // Var varno=1, varattno=1 → member = 1 - (-7) = 8.
     let mut v = var_at(1, 0);
     v.varattno = 1;
-    let node = Node::Expr(Expr::Var(v));
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("t"))).mcx();
+    let node = Node::mk_expr(mcx, Expr::Var(v)).unwrap();
     let r = pull_varattnos(&node, 1, None).expect("non-empty");
     assert_eq!(r.words[0], 1u64 << 8);
 }
 
 #[test]
 fn pull_var_clause_collects_vars() {
-    let node = Node::Expr(op_of(vec![
+    let mcx: Mcx<'static> = Box::leak(Box::new(MemoryContext::new("t"))).mcx();
+    let node = Node::mk_expr(mcx, op_of(vec![
         Expr::Var(var_at(1, 0)),
         Expr::Var(var_at(2, 0)),
-    ]));
+    ])).unwrap();
     let scratch = mcx::MemoryContext::new("pull_var_clause test");
     let vars = pull_var_clause(scratch.mcx(), &node, 0).expect("ok");
     assert_eq!(vars.len(), 2);
