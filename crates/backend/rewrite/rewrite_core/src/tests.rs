@@ -2,7 +2,8 @@
 //! couple of the in-place Var mutators over a bare expression tree.
 
 use crate::relids;
-use ::mcx::{MemoryContext, PgBox, PgVec};
+use alloc::boxed::Box;
+use ::mcx::{MemoryContext, Mcx, PgBox, PgVec};
 use ::nodes::copy_query::Query;
 use ::nodes::nodes::{CmdType, Node, NodePtr};
 use ::nodes::parsenodes::{RTEPermissionInfo, RangeTblEntry};
@@ -45,19 +46,21 @@ fn relids_algebra() {
     assert!(relids::is_empty(&ExprRelids::default()));
 }
 
-fn var(varno: i32, levelsup: u32) -> Node<'static> {
-    Node::Expr(Expr::Var(Var {
+fn var(mcx: Mcx<'static>, varno: i32, levelsup: u32) -> Node<'static> {
+    Node::mk_expr(mcx, Expr::Var(Var {
         varno,
         varlevelsup: levelsup,
         location: -1,
         ..Var::default()
     }))
+    .unwrap()
 }
 
 #[test]
 fn offset_var_nodes_bumps_varno() {
-    let mut n = var(3, 0);
-    crate::offset::OffsetVarNodes(&mut n, 10, 0);
+    let mcx = Box::leak(Box::new(MemoryContext::new("t"))).mcx();
+    let mut n = var(mcx, 3, 0);
+    crate::offset::OffsetVarNodes(&mut n, 10, 0, mcx);
     if let Some(v) = n.as_var() {
         assert_eq!(v.varno, 13);
     } else {
@@ -67,16 +70,17 @@ fn offset_var_nodes_bumps_varno() {
 
 #[test]
 fn change_var_nodes_remaps_varno() {
-    let mut n = var(2, 0);
-    crate::change::ChangeVarNodes(&mut n, 2, 9, 0);
+    let mcx = Box::leak(Box::new(MemoryContext::new("t"))).mcx();
+    let mut n = var(mcx, 2, 0);
+    crate::change::ChangeVarNodes(&mut n, 2, 9, 0, mcx);
     if let Some(v) = n.as_var() {
         assert_eq!(v.varno, 9);
     } else {
         panic!("not a var");
     }
     // sublevels_up mismatch: no change.
-    let mut n2 = var(2, 1);
-    crate::change::ChangeVarNodes(&mut n2, 2, 9, 0);
+    let mut n2 = var(mcx, 2, 1);
+    crate::change::ChangeVarNodes(&mut n2, 2, 9, 0, mcx);
     if let Some(v) = n2.as_var() {
         assert_eq!(v.varno, 2);
     } else {
@@ -86,8 +90,9 @@ fn change_var_nodes_remaps_varno() {
 
 #[test]
 fn increment_var_sublevels_up_bumps() {
-    let mut n = var(1, 0);
-    crate::increment::IncrementVarSublevelsUp(&mut n, 2, 0).unwrap();
+    let mcx = Box::leak(Box::new(MemoryContext::new("t"))).mcx();
+    let mut n = var(mcx, 1, 0);
+    crate::increment::IncrementVarSublevelsUp(&mut n, 2, 0, mcx).unwrap();
     if let Some(v) = n.as_var() {
         assert_eq!(v.varlevelsup, 2);
     } else {
@@ -97,9 +102,10 @@ fn increment_var_sublevels_up_bumps() {
 
 #[test]
 fn add_nulling_relids_adds_to_var() {
-    let mut n = var(4, 0);
+    let mcx = Box::leak(Box::new(MemoryContext::new("t"))).mcx();
+    let mut n = var(mcx, 4, 0);
     let added = rel(&[7]);
-    crate::nulling::add_nulling_relids(&mut n, None, &added);
+    crate::nulling::add_nulling_relids(&mut n, None, &added, mcx);
     if let Some(v) = n.as_var() {
         assert!(relids::is_member(7, &v.varnullingrels));
     } else {
@@ -112,19 +118,20 @@ fn add_nulling_relids_adds_to_var() {
 // ---------------------------------------------------------------------------
 
 /// A bare boolean-ish qual Var node (lifetime-free `Expr`), wrapped as a Node.
-fn qual_var(varno: i32) -> Node<'static> {
-    Node::Expr(Expr::Var(Var {
+fn qual_var(mcx: Mcx<'static>, varno: i32) -> Node<'static> {
+    Node::mk_expr(mcx, Expr::Var(Var {
         varno,
         varlevelsup: 0,
         location: -1,
         ..Var::default()
     }))
+    .unwrap()
 }
 
 #[test]
 fn add_qual_into_empty_where() {
-    let ctx = MemoryContext::new("t");
-    let mcx = ctx.mcx();
+    let ctx = Box::leak(Box::new(MemoryContext::new("t")));
+    let mcx: Mcx<'static> = ctx.mcx();
     let mut q = Query::new(mcx);
     q.commandType = CmdType::CMD_SELECT;
     q.jointree = Some(
@@ -138,7 +145,7 @@ fn add_qual_into_empty_where() {
         .unwrap(),
     );
 
-    let qual = qual_var(5);
+    let qual = qual_var(mcx, 5);
     crate::manip_rule::AddQual(&mut q, Some(&qual), mcx).unwrap();
 
     // The single qual becomes the WHERE clause directly (make_and_qual: q2 alone).
@@ -152,11 +159,11 @@ fn add_qual_into_empty_where() {
 
 #[test]
 fn add_qual_ands_with_existing() {
-    let ctx = MemoryContext::new("t");
+    let ctx = Box::leak(Box::new(MemoryContext::new("t")));
     let mcx = ctx.mcx();
     let mut q = Query::new(mcx);
     q.commandType = CmdType::CMD_SELECT;
-    let existing = PgBox::try_new_in(qual_var(1), mcx).unwrap();
+    let existing = PgBox::try_new_in(qual_var(mcx, 1), mcx).unwrap();
     q.jointree = Some(
         PgBox::try_new_in(
             FromExpr {
@@ -168,7 +175,7 @@ fn add_qual_ands_with_existing() {
         .unwrap(),
     );
 
-    let qual = qual_var(2);
+    let qual = qual_var(mcx, 2);
     crate::manip_rule::AddQual(&mut q, Some(&qual), mcx).unwrap();
 
     // Now an AND of the two quals.
@@ -181,7 +188,7 @@ fn add_qual_ands_with_existing() {
 
 #[test]
 fn add_qual_none_is_noop() {
-    let ctx = MemoryContext::new("t");
+    let ctx = Box::leak(Box::new(MemoryContext::new("t")));
     let mcx = ctx.mcx();
     let mut q = Query::new(mcx);
     q.commandType = CmdType::CMD_SELECT;
@@ -201,18 +208,18 @@ fn add_qual_none_is_noop() {
 
 #[test]
 fn add_qual_on_setop_errors() {
-    let ctx = MemoryContext::new("t");
+    let ctx = Box::leak(Box::new(MemoryContext::new("t")));
     let mcx = ctx.mcx();
     let mut q = Query::new(mcx);
     q.commandType = CmdType::CMD_SELECT;
-    q.setOperations = Some(PgBox::try_new_in(qual_var(9), mcx).unwrap());
-    let qual = qual_var(1);
+    q.setOperations = Some(PgBox::try_new_in(qual_var(mcx, 9), mcx).unwrap());
+    let qual = qual_var(mcx, 1);
     assert!(crate::manip_rule::AddQual(&mut q, Some(&qual), mcx).is_err());
 }
 
 #[test]
 fn add_inverted_qual_wraps_is_not_true() {
-    let ctx = MemoryContext::new("t");
+    let ctx = Box::leak(Box::new(MemoryContext::new("t")));
     let mcx = ctx.mcx();
     let mut q = Query::new(mcx);
     q.commandType = CmdType::CMD_SELECT;
@@ -227,7 +234,7 @@ fn add_inverted_qual_wraps_is_not_true() {
         .unwrap(),
     );
 
-    let qual = qual_var(3);
+    let qual = qual_var(mcx, 3);
     crate::manip_rule::AddInvertedQual(&mut q, Some(&qual), mcx).unwrap();
 
     let quals = q.jointree.as_deref().unwrap().quals.as_deref().unwrap();
@@ -250,7 +257,7 @@ fn adjust_join_tree_list_removes_matching_rtr() {
     let mut q = Query::new(mcx);
     let mut fromlist: PgVec<NodePtr> = PgVec::new_in(mcx);
     for idx in [1i32, 2, 3] {
-        fromlist.push(PgBox::try_new_in(Node::mk_range_tbl_ref(mcx, RangeTblRef { rtindex: idx }), mcx).unwrap());
+        fromlist.push(PgBox::try_new_in(Node::mk_range_tbl_ref(mcx, RangeTblRef { rtindex: idx }).unwrap(), mcx).unwrap());
     }
     q.jointree = Some(
         PgBox::try_new_in(
