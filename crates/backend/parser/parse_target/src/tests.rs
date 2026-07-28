@@ -12,7 +12,8 @@ fn string_node<'mcx>(mcx: Mcx<'mcx>, s: &str) -> NodePtr<'mcx> {
         mcx,
         Node::mk_string(mcx, StringNode {
             sval: PgString::from_str_in(s, mcx).unwrap(),
-        }),
+        })
+        .unwrap(),
     )
     .unwrap()
 }
@@ -48,7 +49,7 @@ fn figure_index_colname_returns_none_without_name() {
 fn figure_colname_nullif() {
     let root = MemoryContext::new("t");
     let mcx = root.mcx();
-    let ae = Node::A_Expr(::nodes::rawnodes::A_Expr {
+    let ae = Node::mk_a_expr(mcx, ::nodes::rawnodes::A_Expr {
         kind: ::nodes::rawnodes::A_Expr_Kind::AEXPR_NULLIF,
         name: PgVec::new_in(mcx),
         lexpr: None,
@@ -56,7 +57,8 @@ fn figure_colname_nullif() {
         rexpr_list_start: -1,
         rexpr_list_end: -1,
         location: -1,
-    });
+    })
+    .unwrap();
     assert_eq!(FigureColname(Some(&ae)).as_deref(), Some("nullif"));
 }
 

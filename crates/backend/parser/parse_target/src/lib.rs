@@ -2453,5 +2453,5 @@ pub fn init_seams() {
     parser_relation_seams::expand_record_variable::set(expand_record_variable_seam);
 }
 
-// #[cfg(test)]
-// mod tests;
+#[cfg(test)]
+mod tests;
