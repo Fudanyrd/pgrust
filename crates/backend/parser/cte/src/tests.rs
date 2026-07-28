@@ -27,7 +27,7 @@ fn install_seams() {
 // --- node builders -------------------------------------------------------
 
 fn rangevar<'mcx>(mcx: Mcx<'mcx>, name: &str) -> PgResult<Node<'mcx>> {
-    Ok(Node::RangeVar(RangeVar {
+    Ok(Node::mk_range_var(mcx, RangeVar {
         catalogname: None,
         schemaname: None,
         relname: Some(PgString::from_str_in(name, mcx)?),
@@ -35,7 +35,8 @@ fn rangevar<'mcx>(mcx: Mcx<'mcx>, name: &str) -> PgResult<Node<'mcx>> {
         relpersistence: b'p' as i8,
         alias: None,
         location: -1,
-    }))
+    })
+    .unwrap())
 }
 
 fn empty_select<'mcx>(mcx: Mcx<'mcx>) -> SelectStmt<'mcx> {
@@ -108,7 +109,7 @@ fn with_clause<'mcx>(
 ) -> PgResult<WithClause<'mcx>> {
     let mut v: PgVec<'mcx, PgBox<'mcx, Node<'mcx>>> = PgVec::new_in(mcx);
     for c in ctes {
-        v.push(::mcx::alloc_in(mcx, Node::CommonTableExpr(c))?);
+        v.push(::mcx::alloc_in(mcx, Node::mk_common_table_expr(mcx, c)?)?);
     }
     Ok(WithClause {
         ctes: v,
@@ -126,8 +127,8 @@ fn duplicate_cte_name_rejected() {
     install_seams();
     let mut pstate = ParseState::new(mcx).unwrap();
 
-    let c1 = cte(mcx, "a", Node::SelectStmt(empty_select(mcx))).unwrap();
-    let c2 = cte(mcx, "a", Node::SelectStmt(empty_select(mcx))).unwrap();
+    let c1 = cte(mcx, "a", Node::mk_select_stmt(mcx, empty_select(mcx)).unwrap()).unwrap();
+    let c2 = cte(mcx, "a", Node::mk_select_stmt(mcx, empty_select(mcx)).unwrap()).unwrap();
     let wc = with_clause(mcx, false, alloc::vec![c1, c2]).unwrap();
 
     let err = transformWithClause(mcx, &mut pstate, wc).unwrap_err();
@@ -180,8 +181,8 @@ fn dependency_graph_orders_forward_refs() {
     // CTE "a" references "b"; "b" has no deps. Safe order: b before a.
     let mut a_q = empty_select(mcx);
     a_q.fromClause.push(::mcx::alloc_in(mcx, rangevar(mcx, "b").unwrap()).unwrap());
-    let a = cte(mcx, "a", Node::SelectStmt(a_q)).unwrap();
-    let b = cte(mcx, "b", Node::SelectStmt(empty_select(mcx))).unwrap();
+    let a = cte(mcx, "a", Node::mk_select_stmt(mcx, a_q).unwrap()).unwrap();
+    let b = cte(mcx, "b", Node::mk_select_stmt(mcx, empty_select(mcx)).unwrap()).unwrap();
 
     let (order, _rec) = build_and_sort(mcx, &mut pstate, alloc::vec![a, b]).unwrap();
     assert_eq!(order, alloc::vec!["b".to_string(), "a".to_string()]);
@@ -197,7 +198,7 @@ fn self_reference_marks_recursive() {
     // CTE "r" references itself -> cterecursive = true, no cross-deps.
     let mut r_q = empty_select(mcx);
     r_q.fromClause.push(::mcx::alloc_in(mcx, rangevar(mcx, "r").unwrap()).unwrap());
-    let r = cte(mcx, "r", Node::SelectStmt(r_q)).unwrap();
+    let r = cte(mcx, "r", Node::mk_select_stmt(mcx, r_q).unwrap()).unwrap();
 
     let (order, rec) = build_and_sort(mcx, &mut pstate, alloc::vec![r]).unwrap();
     assert_eq!(order, alloc::vec!["r".to_string()]);
@@ -214,10 +215,10 @@ fn mutual_recursion_rejected() {
     // a -> b and b -> a: mutual recursion, no acyclic order exists.
     let mut a_q = empty_select(mcx);
     a_q.fromClause.push(::mcx::alloc_in(mcx, rangevar(mcx, "b").unwrap()).unwrap());
-    let a = cte(mcx, "a", Node::SelectStmt(a_q)).unwrap();
+    let a = cte(mcx, "a", Node::mk_select_stmt(mcx, a_q).unwrap()).unwrap();
     let mut b_q = empty_select(mcx);
     b_q.fromClause.push(::mcx::alloc_in(mcx, rangevar(mcx, "a").unwrap()).unwrap());
-    let b = cte(mcx, "b", Node::SelectStmt(b_q)).unwrap();
+    let b = cte(mcx, "b", Node::mk_select_stmt(mcx, b_q).unwrap()).unwrap();
 
     let err = build_and_sort(mcx, &mut pstate, alloc::vec![a, b]).unwrap_err();
     assert_eq!(err.sqlstate(), ERRCODE_FEATURE_NOT_SUPPORTED);
@@ -259,7 +260,8 @@ fn recursive_query_must_be_union() {
     // A self-referential CTE whose top is a plain SELECT (no UNION) is rejected.
     let mut q = empty_select(mcx);
     q.fromClause.push(::mcx::alloc_in(mcx, rangevar(mcx, "r").unwrap()).unwrap());
-    let err = check_recursion(mcx, &mut pstate, "r", Node::SelectStmt(q)).unwrap_err();
+    let q = Node::mk_select_stmt(mcx, q).unwrap();
+    let err = check_recursion(mcx, &mut pstate, "r", q).unwrap_err();
     assert_eq!(err.sqlstate(), ERRCODE_INVALID_RECURSION);
 }
 
@@ -272,7 +274,8 @@ fn recursive_reference_in_nonrecursive_term_rejected() {
 
     // non-recursive term (larg) references "r" -> RECURSION_NONRECURSIVETERM.
     let q = union_select(mcx, "r", "r", true).unwrap();
-    let err = check_recursion(mcx, &mut pstate, "r", Node::SelectStmt(q)).unwrap_err();
+    let q = Node::mk_select_stmt(mcx, q).unwrap();
+    let err = check_recursion(mcx, &mut pstate, "r", q).unwrap_err();
     assert_eq!(err.sqlstate(), ERRCODE_INVALID_RECURSION);
 }
 
@@ -286,7 +289,8 @@ fn well_formed_recursion_accepted() {
     // non-recursive term references a base table, recursive term references "r"
     // exactly once: the canonical well-formed recursive CTE.
     let q = union_select(mcx, "base", "r", true).unwrap();
-    check_recursion(mcx, &mut pstate, "r", Node::SelectStmt(q)).unwrap();
+    let q = Node::mk_select_stmt(mcx, q).unwrap();
+    check_recursion(mcx, &mut pstate, "r", q).unwrap();
 }
 
 // --- analyzeCTETargetList ------------------------------------------------
@@ -320,7 +324,7 @@ fn target_list_derives_columns_from_tlist() {
     install_seams();
     let mut pstate = ParseState::new(mcx).unwrap();
 
-    let mut c = cte(mcx, "q", Node::SelectStmt(empty_select(mcx))).unwrap();
+    let mut c = cte(mcx, "q", Node::mk_select_stmt(mcx, empty_select(mcx)).unwrap()).unwrap();
     let tlist = alloc::vec![
         int_te(mcx, 1, "x").unwrap(),
         int_te(mcx, 2, "y").unwrap(),
@@ -341,7 +345,7 @@ fn target_list_too_many_aliases_rejected() {
     let mut pstate = ParseState::new(mcx).unwrap();
 
     // One output column, but two alias names declared -> error.
-    let mut c = cte(mcx, "q", Node::SelectStmt(empty_select(mcx))).unwrap();
+    let mut c = cte(mcx, "q", Node::mk_select_stmt(mcx, empty_select(mcx)).unwrap()).unwrap();
     c.aliascolnames.push(make_string_node(mcx, "a").unwrap());
     c.aliascolnames.push(make_string_node(mcx, "b").unwrap());
     let tlist = alloc::vec![int_te(mcx, 1, "x").unwrap()];
@@ -356,17 +360,17 @@ fn target_list_too_many_aliases_rejected() {
 fn range_tbl_ref_detection() {
     let ctx = MemoryContext::new("t");
     let mcx = ctx.mcx();
-    let rtr = Node::RangeTblRef(RangeTblRef { rtindex: 1 });
+    let rtr = Node::mk_range_tbl_ref(mcx, RangeTblRef { rtindex: 1 }).unwrap();
     assert!(is_range_tbl_ref(Some(&rtr)));
-    let sel = Node::SelectStmt(empty_select(mcx));
+    let sel = Node::mk_select_stmt(mcx, empty_select(mcx)).unwrap();
     assert!(!is_range_tbl_ref(Some(&sel)));
     // SetOperationStmt construction sanity (used by analyzeCTE's expandability
     // check) — just confirm the variant is reachable.
     let sos = SetOperationStmt {
         op: SetOperation::SETOP_UNION,
         all: false,
-        larg: Some(::mcx::alloc_in(mcx, Node::RangeTblRef(RangeTblRef { rtindex: 1 })).unwrap()),
-        rarg: Some(::mcx::alloc_in(mcx, Node::RangeTblRef(RangeTblRef { rtindex: 2 })).unwrap()),
+        larg: Some(::mcx::alloc_in(mcx, Node::mk_range_tbl_ref(mcx, RangeTblRef { rtindex: 1 }).unwrap()).unwrap()),
+        rarg: Some(::mcx::alloc_in(mcx, Node::mk_range_tbl_ref(mcx, RangeTblRef { rtindex: 2 }).unwrap()).unwrap()),
         colTypes: PgVec::new_in(mcx),
         colTypmods: PgVec::new_in(mcx),
         colCollations: PgVec::new_in(mcx),

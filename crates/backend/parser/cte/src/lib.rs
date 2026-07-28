@@ -2190,5 +2190,5 @@ fn refresh_ctenamespace_entry<'mcx>(
 /// wired into `init_all` (cf. parse_collate / parse_oper / functioncmds).
 pub fn init_seams() {}
 
-// #[cfg(test)]
-// mod tests;
+#[cfg(test)]
+mod tests;
