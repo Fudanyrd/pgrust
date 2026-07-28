@@ -1188,5 +1188,5 @@ fn coerce_param_hook_seam(
 // The test module reaches the locale `isupper`/`tolower` ctype symbols directly
 // (to mirror the production fold); those are absent on wasm, so the tests only
 // build off-wasm (wasm64 is a no-test compile-only target here).
-// #[cfg(all(test, not(target_family = "wasm")))]
-// mod tests;
+#[cfg(all(test, not(target_family = "wasm")))]
+mod tests;

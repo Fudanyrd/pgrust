@@ -17,9 +17,9 @@ fn install_test_seams() {
         mb::pg_database_encoding_max_length::set(|| 1);
         // ASCII source text: char index == byte length.
         mb::pg_mbstrlen_with_len::set(|s, limit| {
-            core::str::from_utf8(&s[..limit as usize])
+            core::prelude::v1::Ok(core::str::from_utf8(&s[..limit as usize])
                 .map(|s| s.chars().count() as i32)
-                .unwrap_or(limit)
+                .unwrap_or(limit))
         });
         // Single-byte clip: just the limit.
         mb::pg_mbcliplen::set(|_s, _len, limit| limit);
@@ -242,23 +242,27 @@ fn check_variable_parameters_empty_is_ok() {
 fn node_param_projection() {
     // The extern-param probe's IsA(node, Param) projection: a PARAM_EXTERN Param
     // node is detected as containing an extern param; a PARAM_EXEC one is not.
-    let extern_param = Node::Expr(Expr::Param(Param {
+    let mc = mcx::MemoryContext::new("test");
+    let mcx = mc.mcx();
+    let extern_param = Node::mk_expr(mcx, Expr::Param(Param {
         paramkind: PARAM_EXTERN,
         paramid: 1,
         paramtype: INT4OID,
         paramtypmod: -1,
         paramcollid: InvalidOid,
         location: -1,
-    }));
+    }))
+    .unwrap();
     assert!(query_contains_extern_params_walker(&extern_param));
 
-    let exec_param = Node::Expr(Expr::Param(Param {
+    let exec_param = Node::mk_expr(mcx, Expr::Param(Param {
         paramkind: nodes::primnodes::PARAM_EXEC,
         paramid: 1,
         paramtype: INT4OID,
         paramtypmod: -1,
         paramcollid: InvalidOid,
         location: -1,
-    }));
+    }))
+    .unwrap();
     assert!(!query_contains_extern_params_walker(&exec_param));
 }
